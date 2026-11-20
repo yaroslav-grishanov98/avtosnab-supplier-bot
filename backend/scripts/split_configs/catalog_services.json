@@ -1,0 +1,83 @@
+{
+  "module": "api/v1/catalog/services.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py",
+    "autosnab_bots/**/*.py"
+  ],
+  "groups": {
+    "order_templates": [
+      ".*order_template",
+      "save_cart_as_template"
+    ],
+    "orders": [
+      ".*cart.*",
+      "accept_supplier_order_items",
+      "change_order_item_supplier",
+      "decline_supplier_order_items",
+      "cancel_order_item",
+      "dismiss_unresolved_order_item",
+      "cancel_supplier_order_request",
+      "complete_order",
+      "mark_supplier_order_request_viewed",
+      "set_off_system_order_item_status"
+    ],
+    "favorites": [
+      ".*favorite.*",
+      ".*wishlist.*"
+    ],
+    "venue_structure": [
+      ".*venue_subdivision",
+      ".*off_system_supplier"
+    ],
+    "master_core": [
+      "create_master_product",
+      "MasterProduct(VenueLink|AlreadyLinked)Conflict",
+      "MasterImportQueueUnavailable",
+      "_auto_assign_master_products_to_new_items"
+    ],
+    "product_matrix": [
+      ".*product_matrix.*"
+    ],
+    "tenders": [
+      ".*tender.*",
+      "ActiveTenderConflict",
+      "_tender_item_distribution"
+    ],
+    "master_catalog": [
+      ".*master_product.*",
+      "MasterImportQueueUnavailable",
+      "MasterProduct.*",
+      "_apply_master_product_venue_batch"
+    ],
+    "venue_import": [
+      "apply_venue_import"
+    ],
+    "supplier_prices": [
+      ".*supplier_product_venue_price",
+      "SupplierProductVenuePriceConflict"
+    ],
+    "product_lists": [
+      ".*venue_product_list",
+      ".*_list"
+    ]
+  },
+  "docstrings": {
+    "orders": "Venue cart, orders and supplier order requests.",
+    "favorites": "Venue favorites and wishlists.",
+    "venue_structure": "Venue subdivisions and off-system suppliers.",
+    "product_matrix": "Venue product matrix (company directory).",
+    "order_templates": "Venue order templates.",
+    "tenders": "Tenders: lifecycle, items, offers and distribution.",
+    "master_catalog": "Master catalog: products, imports, venue links and bulk actions.",
+    "venue_import": "Venue product import apply.",
+    "supplier_prices": "Supplier product prices per venue.",
+    "product_lists": "Venue product lists.",
+    "_shared": "Helpers shared by several catalog service modules.",
+    "master_core": "Master product primitives used by both the product matrix and the master catalog."
+  }
+}

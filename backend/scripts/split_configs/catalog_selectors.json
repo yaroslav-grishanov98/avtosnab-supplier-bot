@@ -1,0 +1,99 @@
+{
+  "module": "api/v1/catalog/selectors.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py",
+    "autosnab_bots/**/*.py"
+  ],
+  "groups": {
+    "common": [
+      "owner_linked_venue_ids",
+      "venue_label",
+      "_owner_active_venue_ids"
+    ],
+    "audit": [
+      ".*_audit_log"
+    ],
+    "products": [
+      "catalog_.*",
+      "find_candidate_catalog_products"
+    ],
+    "google_sheets": [
+      "google_sheet_.*"
+    ],
+    "favorites": [
+      "venue_favorites_queryset",
+      "user_wishlists_queryset",
+      "wishlist_items_queryset"
+    ],
+    "orders": [
+      "supplier_group_minimum_order",
+      "venue_(mine_)?supplier_order_rows",
+      "venue_order_detail_queryset",
+      "resolve_venue_order",
+      "venue_(mine_)?unresolved_order_items_queryset",
+      "cart_detail_queryset",
+      "supplier_order_request.*",
+      "resolve_supplier_order_request",
+      "_venue_supplier_order_row",
+      "_group_items_by_supplier",
+      "_build_venue_supplier_order_rows",
+      "_unresolved_order_items"
+    ],
+    "venue_structure": [
+      "venue_subdivisions_queryset",
+      "venue_off_system_suppliers_queryset",
+      "venue_search_queryset"
+    ],
+    "product_matrix": [
+      "venue_product_matrix_queryset"
+    ],
+    "product_lists": [
+      "venue_product_list.*"
+    ],
+    "tenders": [
+      ".*tender.*",
+      "user_supplier_companies",
+      "with_supplier_companies",
+      "invitable_suppliers_queryset",
+      "with_offer_distribution",
+      "price_per_position_unit"
+    ],
+    "master_catalog": [
+      "master_product.*",
+      "venue_import_match_.*",
+      "find_candidate_master_products",
+      "resolve_master_product.*",
+      "resolve_venue_import_rows",
+      "_venue_import_candidates"
+    ],
+    "order_templates": [
+      "venue_order_templates_queryset"
+    ],
+    "supplier_prices": [
+      "resolve_supplier_product_price",
+      "supplier_product_.*",
+      "individual_price_order_history_queryset"
+    ]
+  },
+  "docstrings": {
+    "audit": "Audit log read models.",
+    "products": "Public catalog reads: products, brands, categories, suppliers, countries.",
+    "google_sheets": "Google Sheets export reads.",
+    "favorites": "Venue favorites and wishlists reads.",
+    "orders": "Venue cart, orders and supplier order request reads.",
+    "venue_structure": "Venue subdivisions, off-system suppliers and venue search.",
+    "product_matrix": "Venue product matrix reads.",
+    "product_lists": "Venue product list reads.",
+    "tenders": "Tender reads: lists, items, offers, distribution and availability.",
+    "master_catalog": "Master catalog reads and import matching.",
+    "order_templates": "Venue order template reads.",
+    "supplier_prices": "Supplier product price reads.",
+    "_shared": "Helpers shared by several catalog selector modules.",
+    "common": "Small venue helpers used across catalog selectors."
+  }
+}

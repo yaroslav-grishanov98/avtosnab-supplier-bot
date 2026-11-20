@@ -1,0 +1,229 @@
+{
+  "catalog": {
+    "rows": [
+      {
+        "_issues": [],
+        "name": "Томаты №2",
+        "net": "800",
+        "row_number": 2,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Томаты",
+        "net": "2800",
+        "row_number": 3,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Огурцы сорт 2",
+        "net": "500",
+        "row_number": 4,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Перец ЧИЛИ 170 1/12",
+        "net": "1",
+        "row_number": 5,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Сок 270 1/8",
+        "net": "1",
+        "row_number": 6,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Молоко 1/12",
+        "net": "1000",
+        "row_number": 7,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Сыр",
+        "net": "0.5",
+        "row_number": 8,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Макароны плоские 20",
+        "net": "400",
+        "row_number": 9,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Мука",
+        "net": "1",
+        "row_number": 10,
+        "unit": "шт"
+      },
+      {
+        "_issues": [],
+        "name": "Яйцо С1 10 шт",
+        "net": "1",
+        "row_number": 11,
+        "unit": "шт"
+      }
+    ],
+    "rows_without_name": 0
+  },
+  "supplier": [
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Томаты №2",
+      "net_unit_label": "г",
+      "net_value": "800",
+      "package_composition": null,
+      "price": "101.50",
+      "row_number": 2,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Томаты",
+      "net_unit_label": "г",
+      "net_value": "2800",
+      "package_composition": null,
+      "price": "102.50",
+      "row_number": 3,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Огурцы сорт 2",
+      "net_unit_label": "г",
+      "net_value": "500",
+      "package_composition": null,
+      "price": "103.50",
+      "row_number": 4,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Перец ЧИЛИ 170 1/12",
+      "net_unit_label": "шт",
+      "net_value": "1",
+      "package_composition": null,
+      "price": "104.50",
+      "row_number": 5,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Сок 270 1/8",
+      "net_unit_label": "шт",
+      "net_value": "1",
+      "package_composition": null,
+      "price": "105.50",
+      "row_number": 6,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Молоко 1/12",
+      "net_unit_label": "мл",
+      "net_value": "1000",
+      "package_composition": null,
+      "price": "106.50",
+      "row_number": 7,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Сыр",
+      "net_unit_label": "кг",
+      "net_value": "0.5",
+      "package_composition": null,
+      "price": "107.50",
+      "row_number": 8,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Макароны плоские 20",
+      "net_unit_label": "г",
+      "net_value": "400",
+      "package_composition": null,
+      "price": "108.50",
+      "row_number": 9,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Мука",
+      "net_unit_label": "кг",
+      "net_value": "1",
+      "package_composition": null,
+      "price": "109.50",
+      "row_number": 10,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    },
+    {
+      "_issues": [],
+      "availability_label": null,
+      "country_of_origin": null,
+      "delivery_multiple": null,
+      "min_order_qty": null,
+      "name": "Яйцо С1 10 шт",
+      "net_unit_label": "шт",
+      "net_value": "1",
+      "package_composition": null,
+      "price": "110.50",
+      "row_number": 11,
+      "supplier_sku": null,
+      "unit_label": "шт"
+    }
+  ]
+}

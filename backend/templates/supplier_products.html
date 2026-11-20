@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ supplier_name }} — Товары | АвтоСнаб</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FBFF; color: #1a1a2e; font-size: 14px; }
+
+    .nav { height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E7EC; padding: 0 32px; display: flex; align-items: center; gap: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); position: sticky; top: 0; z-index: 40; }
+    .nav-logo { font-size: 16px; font-weight: 600; color: #1568F7; display: flex; align-items: center; gap: 8px; }
+    .nav-logo svg { width: 24px; height: 24px; }
+    .nav-supplier { margin-left: auto; font-size: 14px; color: #667085; font-weight: 400; }
+
+    .toolbar { padding: 16px 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
+    .toolbar-right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+
+    .search-input { height: 36px; min-width: 240px; max-width: 320px; padding: 0 12px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 14px; outline: none; background: #FFFFFF; transition: border-color .15s; }
+    .search-input:focus { border-color: #1568F7; }
+
+    .count-badge { font-size: 13px; color: #667085; }
+
+    .table-wrap { padding: 0 32px 32px; }
+    .table-frame { border-radius: 8px; border: 1px solid #E4E7EC; overflow: hidden; }
+    .table-scroll { overflow-x: auto; }
+    table { display: grid; grid-template-columns: 32px 90px 56px minmax(100px, 1fr) 90px 100px 110px 130px 80px 90px 56px 80px 92px 88px 110px; min-width: 100%; align-items: center; background: #FFFFFF; font-size: 13px; }
+    thead, tbody { display: contents; }
+    tr { display: contents; }
+    thead th { padding: 10px 12px; text-align: left; font-weight: 500; font-size: 12px; color: #667085; background: #FFFFFF; border-bottom: 1px solid #E4E7EC; white-space: nowrap; overflow: hidden; }
+    td { padding: 8px 12px; border-bottom: 1px solid #F0F2F5; color: #344054; min-height: 44px; display: flex; align-items: center; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F8FBFF; }
+
+    .price { font-weight: 500; white-space: nowrap; }
+    .prev-price { font-size: 12px; color: #8E8E93; text-decoration: line-through; }
+    .prev-price-link { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 4px; padding: 1px 4px; transition: background .15s, color .15s; }
+    .prev-price-link:hover { background: #EBF1FF; color: #1568F7; }
+    .prev-price-link:hover .prev-price { color: #1568F7; text-decoration-color: #1568F7; }
+    .prev-price-link svg { opacity: 0.5; flex-shrink: 0; transition: opacity .15s; }
+    .prev-price-link:hover svg { opacity: 1; }
+    .price-up { color: #FF3B30; }
+    .price-down { color: #22C55E; }
+    tr.changed td { background: #FFFBEB; }
+    tr.changed:hover td { background: #FEF3C7; }
+    .change-badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 1px 6px; border-radius: 4px; background: #FEF3C7; color: #92400E; margin-left: 4px; }
+    .empty { text-align: center; padding: 48px; color: #8E8E93; font-size: 14px; grid-column: 1 / -1; justify-content: center; }
+
+    /* Editable cells */
+    td.editable { cursor: pointer; position: relative; }
+    td.editable:hover { background: #EBF1FF; }
+    td.editing { padding: 4px 6px; }
+    td.editing input, td.editing select { width: 100%; height: 30px; padding: 2px 8px; border: 1px solid #1568F7; border-radius: 4px; font-size: 13px; outline: none; background: #FFFFFF; }
+
+    /* Action buttons */
+    .btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s; }
+    .btn-primary { background: #1568F7; color: #FFFFFF; }
+    .btn-primary:hover { background: #1250D0; }
+    .btn-ghost { background: transparent; border: 1px solid #D0D5DD; color: #344054; }
+    .btn-ghost:hover { background: #F0F2F5; }
+    .btn-danger { background: transparent; color: #FF3B30; padding: 4px 8px; font-size: 12px; }
+    .btn-danger:hover { background: #FFF0F0; }
+    .btn-save { background: #22C55E; color: #FFFFFF; padding: 4px 10px; font-size: 12px; }
+    .btn-save:hover { background: #16A34A; }
+    .btn-cancel { background: transparent; color: #667085; padding: 4px 10px; font-size: 12px; border: 1px solid #D0D5DD; }
+    .btn-cancel:hover { background: #F0F2F5; }
+
+    .actions { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+    .btn-row-action { opacity: 0; pointer-events: none; transition: opacity .12s; }
+    tr:hover .btn-row-action { opacity: 1; pointer-events: auto; }
+
+    /* Comment tooltip */
+    .comment-icon { cursor: help; color: #98A2B3; font-size: 13px; margin-left: 4px; }
+    .comment-icon:hover { color: #344054; }
+
+    /* Group filter select */
+    .group-filter { height: 36px; padding: 0 10px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 13px; background: #fff; color: #344054; cursor: pointer; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinning { display: inline-block; animation: spin 0.7s linear infinite; }
+
+    /* Bulk action bar */
+    .bulk-bar { display: none; align-items: center; gap: 10px; padding: 8px 32px; background: #EFF6FF; border-bottom: 1px solid #BFDBFE; font-size: 13px; }
+    .bulk-bar.visible { display: flex; }
+    input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #1568F7; }
+
+    /* Page size buttons */
+    .page-size-wrap { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #667085; }
+    .page-size-wrap button { min-width: 36px; height: 28px; padding: 0 8px; border: 1px solid #D0D5DD; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; color: #344054; }
+    .page-size-wrap button.active { background: #1568F7; color: #fff; border-color: #1568F7; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #FFFFFF; z-index: 1000; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .toast-success { background: #22C55E; }
+    .toast-error { background: #FF3B30; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 900; justify-content: center; align-items: center; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: #FFFFFF; border-radius: 12px; padding: 24px; width: 90%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+    .modal-field { margin-bottom: 12px; }
+    .modal-field label { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; font-weight: 500; }
+    .modal-field input, .modal-field select { width: 100%; height: 36px; padding: 0 12px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 14px; outline: none; }
+    .modal-field input:focus, .modal-field select:focus { border-color: #1568F7; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+    /* Flash highlight on saved row */
+    @keyframes flashSaved { 0%,100% { background: inherit; } 30% { background: #D1FAE5; } }
+    tr.flash-saved { animation: flashSaved 1.2s ease; }
+
+    /* Search with clear button */
+    .search-wrap { position: relative; display: inline-flex; align-items: center; }
+    .search-wrap .search-input { padding-right: 28px; }
+    .search-clear { position: absolute; right: 6px; background: none; border: none; cursor: pointer; color: #98A2B3; font-size: 13px; line-height: 1; padding: 2px 4px; display: none; }
+    .search-clear:hover { color: #344054; }
+    .search-clear.visible { display: block; }
+
+    /* Sortable headers */
+    thead th.sortable { cursor: pointer; user-select: none; }
+    thead th.sortable:hover { color: #1568F7; }
+    .sort-icon { font-size: 10px; margin-left: 2px; }
+    thead th.sort-active { color: #1568F7; }
+
+    /* Changed filter button active state */
+    .btn-filter-on { background: #1568F7 !important; color: #fff !important; border-color: #1568F7 !important; }
+
+    /* Pagination */
+    .pagination { padding: 12px 32px; display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .pagination button { min-width: 36px; height: 36px; padding: 0 10px; border: 1px solid #D0D5DD; border-radius: 6px; background: #FFFFFF; font-size: 13px; cursor: pointer; color: #344054; }
+    .pagination button:hover { background: #F0F2F5; }
+    .pagination button.active { background: #1568F7; color: #FFFFFF; border-color: #1568F7; }
+    .pagination button:disabled { opacity: 0.4; cursor: default; }
+    .pagination .page-info { font-size: 13px; color: #667085; margin: 0 8px; }
+
+    /* Price history drawer */
+    .ph-overlay { display: none; position: fixed; inset: 0; z-index: 1500; }
+    .ph-overlay.show { display: block; }
+    .ph-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.25); }
+    .ph-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 380px; background: #FFFFFF; box-shadow: -4px 0 24px rgba(0,0,0,0.12); display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s ease; }
+    .ph-overlay.show .ph-drawer { transform: translateX(0); }
+    .ph-header { padding: 20px 20px 16px; border-bottom: 1px solid #E4E7EC; flex-shrink: 0; }
+    .ph-header h3 { font-size: 16px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+    .ph-header .ph-product { font-size: 13px; color: #667085; line-height: 1.4; }
+    .ph-close { position: absolute; top: 16px; right: 16px; width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 18px; color: #667085; line-height: 1; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+    .ph-close:hover { background: #F0F2F5; color: #1a1a2e; }
+    .ph-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .ph-loading { text-align: center; color: #667085; font-size: 14px; padding: 32px; }
+    .ph-empty { text-align: center; color: #8E8E93; font-size: 14px; padding: 32px; }
+    .ph-item { position: relative; padding: 14px 0 14px 28px; border-bottom: 1px solid #F0F2F5; }
+    .ph-item:last-child { border-bottom: none; }
+    .ph-item::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: #E4E7EC; }
+    .ph-item::after { content: ''; position: absolute; left: 5px; top: 20px; width: 8px; height: 8px; border-radius: 50%; background: #1568F7; }
+    .ph-item.ph-current::after { background: #22C55E; }
+    .ph-price-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .ph-price { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .ph-price-old { font-size: 13px; color: #8E8E93; text-decoration: line-through; }
+    .ph-delta { font-size: 12px; font-weight: 500; padding: 1px 6px; border-radius: 4px; }
+    .ph-delta.up { background: #FEE2E2; color: #DC2626; }
+    .ph-delta.down { background: #DCFCE7; color: #16A34A; }
+    .ph-date { font-size: 12px; color: #8E8E93; }
+    .ph-label-current { font-size: 11px; font-weight: 500; color: #22C55E; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+
+    /* Lightbox */
+    .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; cursor: zoom-out; }
+    .lightbox.show { display: flex; }
+    .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; box-shadow: 0 8px 48px rgba(0,0,0,0.6); }
+    .lightbox-close { position: absolute; top: 16px; right: 20px; font-size: 28px; color: #fff; cursor: pointer; line-height: 1; opacity: 0.8; }
+    .lightbox-close:hover { opacity: 1; }
+
+    @media (max-width: 768px) {
+      .nav { padding: 0 16px; }
+      .toolbar { padding: 16px; }
+      .table-wrap { padding: 0 8px 16px; }
+      th, td { padding: 8px 10px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1568F7" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg>
+    АвтоСнаб
+  </div>
+  <a href="/cabinet/supplier/{{ supplier_id }}/" style="margin-left:auto;font-size:14px;color:#1568F7;text-decoration:none;font-weight:500;">🏢 Мой кабинет</a>
+  <span class="nav-supplier">{{ supplier_name }}</span>
+</nav>
+
+<div class="toolbar">
+  <h1>Мои товары</h1>
+  <div class="toolbar-right">
+    <button class="btn btn-ghost" id="refreshBtn" onclick="refreshProducts()" title="Обновить список товаров из базы">↻ Обновить</button>
+    <button class="btn btn-ghost" onclick="exportCsv()" title="Скачать текущий (отфильтрованный) список">⬇ CSV</button>
+    <button class="btn btn-primary" onclick="openAddModal()">+ Добавить товар</button>
+    <div class="search-wrap">
+      <input type="text" id="search" class="search-input" placeholder="Поиск по названию, артикулу, группе..." oninput="onSearchInput()">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Очистить поиск">✕</button>
+    </div>
+    <select id="groupFilter" class="group-filter" onchange="onGroupFilterChange()"><option value="">Все группы</option></select>
+    <select id="subgroupFilter" class="group-filter" onchange="onSubgroupFilterChange()" style="display:none;"><option value="">Все подгруппы</option></select>
+    <button class="btn btn-ghost" id="changedFilterBtn" onclick="toggleChangedFilter()" title="Показать только товары с изменением цены">Изменённые</button>
+    <button class="btn btn-ghost" id="resetFiltersBtn" onclick="resetFilters()" style="display:none;color:#FF3B30;border-color:#FF3B30;" title="Сбросить все фильтры">✕ Сбросить</button>
+    <span class="count-badge" id="countBadge">{{ products_count }} позиций</span>
+  </div>
+</div>
+
+<div class="bulk-bar" id="bulkBar">
+  <span id="bulkCount">0 выбрано</span>
+  <button class="btn btn-danger" onclick="bulkArchive()">В архив выбранные</button>
+  <button class="btn btn-ghost" onclick="clearSelection()">Отменить выбор</button>
+</div>
+
+<div class="table-wrap">
+  <div class="table-frame">
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="Выбрать все"></th>
+        <th class="sortable" data-sort="system_sku" onclick="toggleSort('system_sku')">Артикул <span class="sort-icon"></span></th>
+        <th>Фото</th>
+        <th class="sortable" data-sort="normalized_name" onclick="toggleSort('normalized_name')">Наименование <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="brand" onclick="toggleSort('brand')">Бренд <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="group" onclick="toggleSort('group')">Группа <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="subgroup" onclick="toggleSort('subgroup')">Подгруппа <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="product_type" onclick="toggleSort('product_type')">Вид <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="price" onclick="toggleSort('price')">Цена <span class="sort-icon"></span></th>
+        <th class="sortable" data-sort="changed" onclick="toggleSort('changed')">Пред. цена <span class="sort-icon"></span></th>
+        <th>Ед.изм.</th>
+        <th>Упаковка</th>
+        <th>Мин. заказ</th>
+        <th>Кратность</th>
+        <th style="width: 120px;"></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  </div>
+  </div>
+</div>
+
+<div class="pagination" id="pagination"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2 id="modalTitle">Добавить товар</h2>
+    <div class="modal-field">
+      <label>Наименование</label>
+      <input type="text" id="modalRawName" placeholder="Название из прайса">
+    </div>
+    <div class="modal-field">
+      <label>Бренд</label>
+      <input type="text" id="modalBrand" placeholder="Название бренда">
+    </div>
+    <div class="modal-field">
+      <label>Группа</label>
+      <input type="text" id="modalGroup" list="listGroup" placeholder="Напр.: Молочные продукты" oninput="onGroupInput()" autocomplete="off">
+      <datalist id="listGroup"></datalist>
+    </div>
+    <div class="modal-field">
+      <label>Подгруппа</label>
+      <input type="text" id="modalSubgroup" list="listSubgroup" placeholder="Напр.: Сыры" oninput="onSubgroupInput()" autocomplete="off">
+      <datalist id="listSubgroup"></datalist>
+    </div>
+    <div class="modal-field">
+      <label>Вид</label>
+      <input type="text" id="modalProductType" list="listProductType" placeholder="Напр.: Твёрдые сыры" autocomplete="off">
+      <datalist id="listProductType"></datalist>
+    </div>
+    <div class="modal-field">
+      <label>Фото</label>
+      <div id="imageUploadArea" style="border:1px dashed #D0D5DD;border-radius:6px;padding:12px;text-align:center;cursor:pointer;background:#FAFAFA;" onclick="document.getElementById('modalImageFile').click()">
+        <img id="imagePreview" src="" alt="" style="display:none;max-height:80px;max-width:100%;border-radius:4px;margin-bottom:6px;">
+        <div id="imageUploadHint" style="color:#667085;font-size:13px;">Нажмите, чтобы выбрать фото</div>
+        <div id="imageUploadStatus" style="font-size:12px;color:#667085;margin-top:4px;"></div>
+      </div>
+      <input type="file" id="modalImageFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="onImageFileSelected(event)">
+    </div>
+    <div class="modal-field">
+      <label>Цена (₽)</label>
+      <input type="number" id="modalPrice" step="0.01" min="0" placeholder="0.00">
+    </div>
+    <div class="modal-field">
+      <label>Единица измерения</label>
+      <select id="modalUnit"></select>
+    </div>
+    <div class="modal-field">
+      <label>Упаковка</label>
+      <input type="text" id="modalPackage" placeholder="1 кг, 500 мл...">
+    </div>
+    <div class="modal-field">
+      <label>Мин. заказ</label>
+      <input type="number" id="modalMinOrder" step="1" min="0" placeholder="напр.: 5">
+    </div>
+    <div class="modal-field">
+      <label>Кратность заказа</label>
+      <input type="number" id="modalDeliveryMult" step="1" min="0" placeholder="напр.: 6">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAddModal()">Отмена</button>
+      <button class="btn btn-primary" id="modalSaveBtn" onclick="saveFromModal()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPPLIER_ID = '{{ supplier_id }}';
+const ALL_UNITS = {{ units_json|safe }};
+const CATEGORY_TREE = {{ category_tree_json|safe }};
+let ALL_PRODUCTS = {{ products_json|safe }};
+let editingId = null;
+let editingOriginal = null;
+let pageSize = 50;
+let currentPage = 1;
+const selectedIds = new Set();
+let sortKey = null;
+let sortDir = 1;
+let showChangedOnly = false;
+let activeGroupFilter = '';
+let activeSubgroupFilter = '';
+
+function getCsrfToken() {
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+}
+
+function apiHeaders() {
+  return { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() };
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function errorMsg(e, fallback) {
+  try {
+    const raw = e?.message || '';
+    const parsed = JSON.parse(raw);
+    const detail = parsed?.detail || parsed?.non_field_errors?.[0] || Object.values(parsed)[0];
+    if (detail) return String(Array.isArray(detail) ? detail[0] : detail).slice(0, 100);
+  } catch {}
+  const plain = e?.message || '';
+  return plain.length > 5 && plain.length < 200 ? plain.slice(0, 100) : fallback;
+}
+
+function fmtPrice(v) {
+  return v ? Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽' : '—';
+}
+
+function editGroupCell(selectedGroup) {
+  const opts = Object.keys(CATEGORY_TREE).sort().map(g => `<option value="${esc(g)}">`).join('');
+  return `<input class="edit-group" list="egrp-list" value="${esc(selectedGroup)}" oninput="onEditGroupInput(this)" autocomplete="off" style="font-size:12px;">` +
+    `<datalist id="egrp-list">${opts}</datalist>`;
+}
+
+function editSubgroupCell(group, selectedSub) {
+  const opts = (group && CATEGORY_TREE[group] ? Object.keys(CATEGORY_TREE[group]).sort() : [])
+    .map(s => `<option value="${esc(s)}">`).join('');
+  return `<input class="edit-subgroup" list="esub-list" value="${esc(selectedSub)}" oninput="onEditSubgroupInput(this)" autocomplete="off" style="font-size:12px;">` +
+    `<datalist id="esub-list">${opts}</datalist>`;
+}
+
+function editVidCell(group, subgroup, selectedVid) {
+  const opts = ((group && subgroup && CATEGORY_TREE[group]?.[subgroup]) || [])
+    .map(v => `<option value="${esc(v)}">`).join('');
+  return `<input class="edit-vid" list="evid-list" value="${esc(selectedVid)}" autocomplete="off" style="font-size:12px;">` +
+    `<datalist id="evid-list">${opts}</datalist>`;
+}
+
+function onEditGroupInput(el) {
+  const group = el.value.trim();
+  const row = el.closest('tr');
+  row.querySelector('.edit-subgroup').value = '';
+  row.querySelector('.edit-vid').value = '';
+  document.getElementById('esub-list').innerHTML =
+    (group && CATEGORY_TREE[group] ? Object.keys(CATEGORY_TREE[group]).sort() : [])
+      .map(s => `<option value="${esc(s)}">`).join('');
+  document.getElementById('evid-list').innerHTML = '';
+}
+
+function onEditSubgroupInput(el) {
+  const row = el.closest('tr');
+  const group = row.querySelector('.edit-group').value.trim();
+  const sub = el.value.trim();
+  row.querySelector('.edit-vid').value = '';
+  document.getElementById('evid-list').innerHTML =
+    ((group && sub && CATEGORY_TREE[group]?.[sub]) || [])
+      .map(v => `<option value="${esc(v)}">`).join('');
+}
+
+function unitSelect(selectedCode) {
+  return '<select class="edit-unit">' +
+    '<option value="">—</option>' +
+    ALL_UNITS.map(u => `<option value="${u.id}" ${u.code === selectedCode ? 'selected' : ''}>${esc(u.code)}</option>`).join('') +
+    '</select>';
+}
+
+function editImageCell(p) {
+  const curUrl = editImageUrl !== undefined ? editImageUrl : p.image_url;
+  if (curUrl) {
+    return `<div style="display:flex;align-items:center;gap:6px;">
+      <img id="editImgPreview" src="${esc(curUrl)}" style="max-height:40px;max-width:60px;border-radius:4px;object-fit:cover;cursor:zoom-in;" onclick="openLightbox('${esc(curUrl)}')" title="Увеличить">
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <button class="btn btn-ghost" style="font-size:11px;padding:2px 6px;" onclick="document.getElementById('editImgFile').click()">Изменить</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:2px 6px;" onclick="removeEditImage()">Удалить</button>
+      </div>
+    </div>
+    <input type="file" id="editImgFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="onEditImageSelected(event)">`;
+  }
+  return `<div style="font-size:12px;color:#667085;cursor:pointer;padding:4px 0;" onclick="document.getElementById('editImgFile').click()">+ фото</div>
+    <input type="file" id="editImgFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="onEditImageSelected(event)">`;
+}
+
+async function onEditImageSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const cell = document.getElementById('editImgCell');
+  cell.innerHTML = '<span style="font-size:12px;color:#667085;">Загружаю...</span>';
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/images/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      cell.innerHTML = `<span style="font-size:12px;color:#D92D20;">${esc(err.detail || 'Ошибка')}</span>`;
+      return;
+    }
+    const data = await resp.json();
+    editImageUrl = data.image_url;
+    const p = ALL_PRODUCTS.find(x => x.id === editingId);
+    cell.innerHTML = editImageCell(p);
+  } catch {
+    cell.innerHTML = '<span style="font-size:12px;color:#D92D20;">Ошибка сети</span>';
+  }
+}
+
+function removeEditImage() {
+  editImageUrl = null;
+  const p = ALL_PRODUCTS.find(x => x.id === editingId);
+  document.getElementById('editImgCell').innerHTML = editImageCell(p);
+}
+
+function renderRow(p) {
+  if (editingId === p.id) {
+    return `<tr data-id="${p.id}">
+      <td><input type="checkbox" class="row-select" data-id="${p.id}" onchange="onRowSelect()" ${selectedIds.has(p.id)?'checked':''}></td>
+      <td title="Артикул генерируется автоматически" style="cursor:default;color:#98A2B3;">${esc(p.system_sku || '—')}</td>
+      <td class="editing" id="editImgCell">${editImageCell(p)}</td>
+      <td class="editing"><input class="edit-norm" value="${esc(p.normalized_name)}"></td>
+      <td class="editing"><input class="edit-brand" value="${esc(p.brand)}"></td>
+      <td class="editing">${editGroupCell(p.group)}</td>
+      <td class="editing">${editSubgroupCell(p.group, p.subgroup)}</td>
+      <td class="editing">${editVidCell(p.group, p.subgroup, p.product_type)}</td>
+      <td class="editing"><input class="edit-price" type="number" step="0.01" min="0" value="${p.price}"></td>
+      <td class="price">${fmtPrice(p.prev_price)}</td>
+      <td class="editing">${unitSelect(p.unit)}</td>
+      <td class="editing"><input class="edit-pkg" value="${esc(p.package)}"></td>
+      <td class="editing"><input class="edit-moq" type="number" step="0.0001" min="0" value="${esc(p.min_order_qty || '')}" placeholder="—" style="width:70px;"></td>
+      <td class="editing"><input class="edit-mult" type="number" step="0.0001" min="0" value="${esc(p.delivery_multiple || '')}" placeholder="—" style="width:70px;"></td>
+      <td><div class="actions" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <textarea class="edit-comment" rows="2" placeholder="Комментарий..." style="width:160px;font-size:12px;padding:4px 6px;border:1px solid #D0D5DD;border-radius:4px;resize:vertical;">${esc(p.comment || '')}</textarea>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-save" onclick="saveRow('${p.id}')">Сохранить</button>
+          <button class="btn btn-cancel" onclick="cancelEdit()">Отмена</button>
+        </div>
+      </div></td>
+    </tr>`;
+  }
+  const cls = p.changed ? ' class="changed"' : '';
+  let priceCell = fmtPrice(p.price);
+  if (p.prev_price && p.price) {
+    const cur = Number(p.price), prev = Number(p.prev_price);
+    const arrow = cur > prev ? '↑' : cur < prev ? '↓' : '';
+    const colorCls = cur > prev ? 'price-up' : cur < prev ? 'price-down' : '';
+    priceCell = `<span class="${colorCls}">${fmtPrice(p.price)} ${arrow}</span>`;
+  }
+  const histIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const prevCell = p.prev_price
+    ? `<span class="prev-price-link" onclick="openPriceHistory('${p.id}','${esc(p.normalized_name || p.raw_name)}')" title="История изменений цены">${histIcon}<span class="prev-price">${fmtPrice(p.prev_price)}</span></span>${p.price_changed_at ? `<br><span style="font-size:11px;color:#8E8E93;">${p.price_changed_at}</span>` : ''}`
+    : '—';
+  return `<tr data-id="${p.id}"${cls}>
+    <td><input type="checkbox" class="row-select" data-id="${p.id}" onchange="onRowSelect()" ${selectedIds.has(p.id)?'checked':''}></td>
+    <td title="Артикул генерируется автоматически" style="cursor:default;color:#98A2B3;">${esc(p.system_sku || '—')}</td>
+    <td>${p.image_url ? `<img src="${esc(p.image_url)}" loading="lazy" style="max-height:32px;cursor:zoom-in;" onclick="openLightbox('${esc(p.image_url)}')" title="Увеличить">` : '—'}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.normalized_name || '—')}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.brand || '—')}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.group || '—')}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.subgroup || '—')}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.product_type || '—')}</td>
+    <td class="editable price" onclick="startEdit('${p.id}')">${priceCell}</td>
+    <td class="price">${prevCell}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.unit || '—')}</td>
+    <td class="editable" onclick="startEdit('${p.id}')">${esc(p.package || '—')}</td>
+    <td>${esc(p.min_order_qty ? String(p.min_order_qty) : '—')}</td>
+    <td>${esc(p.delivery_multiple ? String(p.delivery_multiple) : '—')}</td>
+    <td><div class="actions">
+      ${p.comment ? `<span class="comment-icon" title="${esc(p.comment)}">💬</span>` : ''}
+      <button class="btn btn-ghost btn-row-action" onclick="startEdit('${p.id}')" style="padding:4px 8px;font-size:12px;">Изменить</button>
+      <button class="btn btn-danger btn-row-action" onclick="archiveProduct('${p.id}')">В архив</button>
+    </div></td>
+  </tr>`;
+}
+
+function render(products) {
+  const tbody = document.getElementById('tableBody');
+  if (!products.length) {
+    const q = document.getElementById('search').value;
+    let emptyMsg;
+    if (showChangedOnly && q) emptyMsg = 'Нет изменённых товаров по запросу «' + q + '».';
+    else if (showChangedOnly)  emptyMsg = 'Нет товаров с изменением цены.';
+    else if (q)                emptyMsg = 'Ничего не найдено по запросу «' + q + '».';
+    else                       emptyMsg = 'Нет товаров. Добавьте первый товар или загрузите прайс через Telegram-бот.';
+    tbody.innerHTML = '<tr><td colspan="15" class="empty">' + emptyMsg + '</td></tr>';
+    const total0 = ALL_PRODUCTS.length;
+  document.getElementById('countBadge').textContent = total0 > 0 ? `0 из ${total0}` : '0 позиций';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  const totalPages = Math.ceil(products.length / pageSize);
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * pageSize;
+  const page = products.slice(start, start + pageSize);
+
+  const total = ALL_PRODUCTS.length;
+  document.getElementById('countBadge').textContent =
+    products.length === total ? `${total} позиций` : `${products.length} из ${total}`;
+  tbody.innerHTML = page.map(renderRow).join('');
+  renderPagination(products.length, totalPages);
+  updateSortIndicators();
+  updateResetBtn();
+  updateBulkBar();
+}
+
+function renderPagination(total, totalPages) {
+  const el = document.getElementById('pagination');
+  const sizeHtml = `<span class="page-size-wrap">Стр:&nbsp;
+    <button class="${pageSize===50?'active':''}" onclick="setPageSize(50)">50</button>
+    <button class="${pageSize===100?'active':''}" onclick="setPageSize(100)">100</button>
+    <button class="${pageSize===200?'active':''}" onclick="setPageSize(200)">200</button>
+  </span>`;
+  if (totalPages <= 1) { el.innerHTML = sizeHtml; return; }
+  let html = sizeHtml + ' ';
+  html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">←</button>`;
+  const range = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+      range.push(i);
+    } else if (range[range.length - 1] !== '...') {
+      range.push('...');
+    }
+  }
+  for (const p of range) {
+    if (p === '...') { html += `<span class="page-info">…</span>`; }
+    else { html += `<button class="${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`; }
+  }
+  html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">→</button>`;
+  html += `<span class="page-info">${(currentPage-1)*pageSize+1}–${Math.min(currentPage*pageSize, total)} из ${total}</span>`;
+  el.innerHTML = html;
+}
+
+function goPage(p) {
+  currentPage = p;
+  render(getFiltered());
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const SORT_GETTERS = {
+  system_sku:      p => (p.system_sku || '').toLowerCase(),
+  normalized_name: p => (p.normalized_name || '').toLowerCase(),
+  brand:           p => (p.brand || '').toLowerCase(),
+  group:           p => (p.group || '').toLowerCase(),
+  subgroup:        p => (p.subgroup || '').toLowerCase(),
+  product_type:    p => (p.product_type || '').toLowerCase(),
+  price:           p => parseFloat(p.price) || 0,
+  changed:         p => p.changed ? 0 : 1,
+};
+
+function sortProducts(arr) {
+  if (!sortKey || !SORT_GETTERS[sortKey]) return arr;
+  const get = SORT_GETTERS[sortKey];
+  return [...arr].sort((a, b) => {
+    const av = get(a), bv = get(b);
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+}
+
+function toggleSort(key) {
+  sortDir = sortKey === key ? -sortDir : 1;
+  sortKey = key;
+  currentPage = 1;
+  saveFilters();
+  render(getFiltered());
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('thead th[data-sort]').forEach(th => {
+    const key = th.dataset.sort;
+    th.classList.toggle('sort-active', key === sortKey);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = key === sortKey ? (sortDir === 1 ? '↑' : '↓') : '';
+  });
+}
+
+function toggleChangedFilter() {
+  showChangedOnly = !showChangedOnly;
+  document.getElementById('changedFilterBtn').classList.toggle('btn-filter-on', showChangedOnly);
+  currentPage = 1;
+  saveFilters();
+  render(getFiltered());
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let result = ALL_PRODUCTS;
+  if (q) result = result.filter(p =>
+    (p.normalized_name || '').toLowerCase().includes(q) ||
+    (p.brand || '').toLowerCase().includes(q) ||
+    (p.system_sku || '').toLowerCase().includes(q) ||
+    (p.group || '').toLowerCase().includes(q) ||
+    (p.subgroup || '').toLowerCase().includes(q) ||
+    (p.product_type || '').toLowerCase().includes(q)
+  );
+  if (activeGroupFilter) result = result.filter(p => p.group === activeGroupFilter);
+  if (activeSubgroupFilter) result = result.filter(p => p.subgroup === activeSubgroupFilter);
+  if (showChangedOnly) result = result.filter(p => p.changed);
+  return sortProducts(result);
+}
+
+function onGroupFilterChange() {
+  activeGroupFilter = document.getElementById('groupFilter').value;
+  activeSubgroupFilter = '';
+  currentPage = 1;
+  buildSubgroupFilter();
+  saveFilters();
+  render(getFiltered());
+}
+
+function onSubgroupFilterChange() {
+  activeSubgroupFilter = document.getElementById('subgroupFilter').value;
+  currentPage = 1;
+  saveFilters();
+  render(getFiltered());
+}
+
+function onRowSelect() {
+  document.querySelectorAll('.row-select').forEach(cb => {
+    if (cb.checked) selectedIds.add(cb.dataset.id);
+    else selectedIds.delete(cb.dataset.id);
+  });
+  updateBulkBar();
+}
+
+function toggleSelectAll(master) {
+  const visible = getFiltered().slice((currentPage-1)*pageSize, currentPage*pageSize);
+  visible.forEach(p => master.checked ? selectedIds.add(p.id) : selectedIds.delete(p.id));
+  document.querySelectorAll('.row-select').forEach(cb => { cb.checked = master.checked; });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  bar.classList.toggle('visible', selectedIds.size > 0);
+  document.getElementById('bulkCount').textContent = selectedIds.size + ' выбрано';
+  const master = document.getElementById('selectAll');
+  if (master) {
+    const visible = getFiltered().slice((currentPage-1)*pageSize, currentPage*pageSize);
+    master.indeterminate = selectedIds.size > 0 && visible.some(p => !selectedIds.has(p.id));
+    master.checked = visible.length > 0 && visible.every(p => selectedIds.has(p.id));
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-select').forEach(cb => { cb.checked = false; });
+  const master = document.getElementById('selectAll');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  updateBulkBar();
+}
+
+async function bulkArchive() {
+  const ids = [...selectedIds];
+  if (!ids.length) return;
+  if (!confirm('Перенести в архив ' + ids.length + ' товаров?')) return;
+  const btn = document.querySelector('#bulkBar .btn-danger');
+  btn.disabled = true;
+  let done = 0;
+  for (const id of ids) {
+    btn.textContent = 'Архивирую ' + done + '/' + ids.length + '...';
+    try {
+      const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/products/' + id + '/archive/', {
+        method: 'POST', headers: apiHeaders()
+      });
+      if (resp.ok) { ALL_PRODUCTS = ALL_PRODUCTS.filter(x => x.id !== id); selectedIds.delete(id); done++; }
+    } catch {}
+  }
+  btn.disabled = false; btn.textContent = 'В архив выбранные';
+  render(getFiltered());
+  showToast('Архивировано: ' + done + ' из ' + ids.length, done === ids.length ? 'success' : 'error');
+}
+
+function exportCsv() {
+  const cols = ['Артикул','Наименование','Бренд','Группа','Подгруппа','Вид','Цена','Пред. цена','Ед.изм.','Упаковка','Мин. заказ','Кратность','Комментарий'];
+  const rows = getFiltered().map(p => [
+    p.system_sku, p.normalized_name, p.brand, p.group, p.subgroup, p.product_type,
+    p.price, p.prev_price, p.unit, p.package, p.min_order_qty, p.delivery_multiple, p.comment
+  ].map(v => '"' + String(v || '').replace(/"/g, '""') + '"'));
+  const csv = [cols.map(c => '"' + c + '"'), ...rows].map(r => r.join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'товары_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+async function refreshProducts() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinning">↻</span> Обновить';
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/products/?limit=2000', { headers: apiHeaders() });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    const prevMap = {};
+    ALL_PRODUCTS.forEach(p => { prevMap[p.id] = p; });
+    ALL_PRODUCTS = data.results.map(r => ({
+      id: r.id,
+      raw_name: r.supplier_raw_name || '',
+      normalized_name: r.supplier_normalized_name || '',
+      price: r.current_price != null ? String(r.current_price) : '',
+      prev_price: r.prev_price || '',
+      price_changed_at: r.price_changed_at || '',
+      changed: r.changed || false,
+      unit: r.unit || '',
+      unit_id: r.unit_id || '',
+      package: r.package || '',
+      min_order_qty: r.min_order_qty != null ? String(r.min_order_qty) : '',
+      delivery_multiple: r.delivery_multiple != null ? String(r.delivery_multiple) : '',
+      comment: r.comment || '',
+      brand: r.brand || '',
+      category: r.category || '',
+      country: r.country || '',
+      system_sku: r.system_sku || '',
+      image_url: r.image_url || '',
+      group: r.group || '',
+      subgroup: r.subgroup || '',
+      product_type: r.product_type || '',
+    }));
+    if (editingId) cancelEdit();
+    buildGroupFilter();
+    render(getFiltered());
+    showToast('Список обновлён', 'success');
+  } catch (e) {
+    showToast(errorMsg(e, 'Ошибка обновления'), 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Обновить'; btn.innerHTML = '↻ Обновить';
+  }
+}
+
+function buildGroupFilter() {
+  const groups = [...new Set(ALL_PRODUCTS.map(p => p.group).filter(Boolean))].sort();
+  const sel = document.getElementById('groupFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Все группы</option>' +
+    groups.map(g => `<option value="${esc(g)}"${g === cur ? ' selected' : ''}>${esc(g)}</option>`).join('');
+  buildSubgroupFilter();
+}
+
+function buildSubgroupFilter() {
+  const sel = document.getElementById('subgroupFilter');
+  if (!activeGroupFilter) { sel.style.display = 'none'; sel.value = ''; return; }
+  const subs = [...new Set(
+    ALL_PRODUCTS.filter(p => p.group === activeGroupFilter).map(p => p.subgroup).filter(Boolean)
+  )].sort();
+  if (!subs.length) { sel.style.display = 'none'; sel.value = ''; return; }
+  sel.innerHTML = '<option value="">Все подгруппы</option>' +
+    subs.map(s => `<option value="${esc(s)}"${s === activeSubgroupFilter ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  sel.style.display = '';
+}
+
+function setPageSize(n) {
+  pageSize = n;
+  currentPage = 1;
+  saveFilters();
+  render(getFiltered());
+}
+
+const FILTER_KEY = 'sp_filters_' + SUPPLIER_ID;
+
+function saveFilters() {
+  const q = document.getElementById('search').value;
+  try {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      q, group: activeGroupFilter, subgroup: activeSubgroupFilter,
+      changed: showChangedOnly, sortKey, sortDir, pageSize,
+    }));
+  } catch {}
+  syncUrl(q);
+}
+
+function syncUrl(q) {
+  const p = new URLSearchParams();
+  if (q) p.set('q', q);
+  if (activeGroupFilter) p.set('group', activeGroupFilter);
+  if (activeSubgroupFilter) p.set('subgroup', activeSubgroupFilter);
+  if (showChangedOnly) p.set('changed', '1');
+  if (sortKey) { p.set('sort', sortKey); p.set('dir', String(sortDir)); }
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+}
+
+function loadFilters() {
+  // URL params take priority over localStorage (allows sharing links)
+  const urlP = new URLSearchParams(location.search);
+  const hasUrl = urlP.has('q') || urlP.has('group') || urlP.has('subgroup') ||
+                 urlP.has('changed') || urlP.has('sort');
+  let s = {};
+  if (!hasUrl) {
+    try { s = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}'); } catch {}
+  }
+  const q   = urlP.get('q')       ?? s.q       ?? '';
+  const grp = urlP.get('group')   ?? s.group   ?? '';
+  const sub = urlP.get('subgroup') ?? s.subgroup ?? '';
+  const chg = urlP.has('changed') ? urlP.get('changed') === '1' : (s.changed ?? false);
+  const sk  = urlP.get('sort')    ?? s.sortKey ?? null;
+  const sd  = urlP.has('dir')     ? Number(urlP.get('dir')) : (s.sortDir ?? 1);
+  const ps  = s.pageSize ?? 50;
+
+  if (q) {
+    document.getElementById('search').value = q;
+    document.getElementById('searchClear').classList.add('visible');
+  }
+  if (grp) activeGroupFilter = grp;
+  if (sub) activeSubgroupFilter = sub;
+  if (chg) {
+    showChangedOnly = true;
+    document.getElementById('changedFilterBtn').classList.add('btn-filter-on');
+  }
+  if (sk) { sortKey = sk; sortDir = sd; }
+  pageSize = ps;
+}
+
+function updateResetBtn() {
+  const active = document.getElementById('search').value ||
+    activeGroupFilter || activeSubgroupFilter || showChangedOnly || sortKey;
+  document.getElementById('resetFiltersBtn').style.display = active ? '' : 'none';
+}
+
+function resetFilters() {
+  document.getElementById('search').value = '';
+  document.getElementById('searchClear').classList.remove('visible');
+  document.getElementById('groupFilter').value = '';
+  activeGroupFilter = '';
+  activeSubgroupFilter = '';
+  buildSubgroupFilter();
+  showChangedOnly = false;
+  document.getElementById('changedFilterBtn').classList.remove('btn-filter-on');
+  sortKey = null;
+  sortDir = 1;
+  currentPage = 1;
+  document.getElementById('resetFiltersBtn').style.display = 'none';
+  saveFilters();
+  render(getFiltered());
+}
+
+let editImageUrl = undefined; // undefined = not changed; null = delete; string = new URL
+
+function startEdit(id) {
+  editingId = id;
+  editingOriginal = ALL_PRODUCTS.find(p => p.id === id);
+  editImageUrl = undefined;
+  render(getFiltered());
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (row) row.querySelector('input')?.focus();
+}
+
+function cancelEdit() {
+  editingId = null;
+  editingOriginal = null;
+  editImageUrl = undefined;
+  render(getFiltered());
+}
+
+async function saveRow(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  const normName = row.querySelector('.edit-norm').value.trim();
+  const brand = row.querySelector('.edit-brand').value.trim();
+  const price = row.querySelector('.edit-price').value;
+  const unitId = row.querySelector('.edit-unit').value;
+  const pkg = row.querySelector('.edit-pkg').value.trim();
+  const editGroup = row.querySelector('.edit-group').value.trim();
+  const editSubgroup = row.querySelector('.edit-subgroup').value.trim();
+  const editVid = row.querySelector('.edit-vid').value.trim();
+  const newCategoryPath = [editGroup, editSubgroup, editVid].filter(Boolean);
+  const origCategoryPath = [editingOriginal.group, editingOriginal.subgroup, editingOriginal.product_type].filter(Boolean);
+  const categoryChanged = JSON.stringify(newCategoryPath) !== JSON.stringify(origCategoryPath);
+
+  const body = {};
+  if (normName !== editingOriginal.normalized_name) body.supplier_normalized_name = normName;
+  if (brand !== (editingOriginal.brand || '')) body.brand = brand;
+  if (price && price !== editingOriginal.price) body.price = price;
+  if (unitId && unitId !== editingOriginal.unit_id) body.unit_id = unitId;
+  if (pkg !== editingOriginal.package) body.package = pkg;
+  if (editImageUrl !== undefined) body.image_url = editImageUrl || '';
+  if (categoryChanged) body.category_path = newCategoryPath;
+
+  if (!Object.keys(body).length) { cancelEdit(); return; }
+
+  const moq = row.querySelector('.edit-moq')?.value ?? '';
+  if (moq !== (editingOriginal.min_order_qty || '')) body.min_order_qty = moq ? moq : null;
+  const mult = row.querySelector('.edit-mult')?.value ?? '';
+  if (mult !== (editingOriginal.delivery_multiple || '')) body.delivery_multiple = mult ? mult : null;
+  const comment = row.querySelector('.edit-comment')?.value ?? '';
+  if (comment !== (editingOriginal.comment || '')) body.comment = comment || null;
+
+  const saveBtn = document.querySelector(`tr[data-id="${id}"] .btn-save`);
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Сохраняю...'; }
+
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/products/' + id + '/', {
+      method: 'PATCH', headers: apiHeaders(), body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const updated = await resp.json();
+    const idx = ALL_PRODUCTS.findIndex(p => p.id === id);
+    const priceDidChange = body.price !== undefined;
+    ALL_PRODUCTS[idx] = {
+      id: updated.id,
+      raw_name: updated.supplier_raw_name || '',
+      normalized_name: updated.supplier_normalized_name || '',
+      price: updated.current_price != null ? String(updated.current_price) : '',
+      unit: updated.unit || '',
+      unit_id: unitId || ALL_PRODUCTS[idx].unit_id,
+      package: updated.package || '',
+      prev_price: priceDidChange ? (updated.previous_price || '') : ALL_PRODUCTS[idx].prev_price,
+      price_changed_at: priceDidChange ? (updated.price_changed_at || '') : ALL_PRODUCTS[idx].price_changed_at,
+      changed: priceDidChange ? updated.previous_price != null : ALL_PRODUCTS[idx].changed,
+      system_sku: ALL_PRODUCTS[idx].system_sku,
+      brand: updated.brand !== undefined ? updated.brand : ALL_PRODUCTS[idx].brand,
+      group: categoryChanged ? (newCategoryPath[0] || '') : ALL_PRODUCTS[idx].group,
+      subgroup: categoryChanged ? (newCategoryPath[1] || '') : ALL_PRODUCTS[idx].subgroup,
+      product_type: categoryChanged ? (newCategoryPath[2] || '') : ALL_PRODUCTS[idx].product_type,
+      image_url: editImageUrl !== undefined ? (editImageUrl || '') : ALL_PRODUCTS[idx].image_url,
+      min_order_qty: updated.min_order_qty != null ? String(updated.min_order_qty) : '',
+      delivery_multiple: updated.delivery_multiple != null ? String(updated.delivery_multiple) : '',
+      comment: updated.comment || '',
+    };
+    editingId = null;
+    editingOriginal = null;
+    editImageUrl = undefined;
+    render(getFiltered());
+    const savedRow = document.querySelector(`tr[data-id="${id}"]`);
+    if (savedRow) {
+      savedRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      savedRow.classList.add('flash-saved');
+      savedRow.addEventListener('animationend', () => savedRow.classList.remove('flash-saved'), { once: true });
+    }
+    showToast('Сохранено', 'success');
+  } catch (e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Сохранить'; }
+    showToast(errorMsg(e, 'Ошибка сохранения'), 'error');
+  }
+}
+
+async function archiveProduct(id) {
+  const p = ALL_PRODUCTS.find(x => x.id === id);
+  const name = p?.normalized_name || p?.raw_name || 'товар';
+  if (!confirm('Перенести в архив «' + name + '»?')) return;
+  const btn = document.querySelector(`tr[data-id="${id}"] .btn-danger`);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/products/' + id + '/archive/', {
+      method: 'POST', headers: apiHeaders()
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    ALL_PRODUCTS = ALL_PRODUCTS.filter(x => x.id !== id);
+    selectedIds.delete(id);
+    render(getFiltered());
+    showToast('«' + name + '» перенесён в архив', 'success');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'В архив'; }
+    showToast(errorMsg(e, 'Ошибка архивирования'), 'error');
+  }
+}
+
+let uploadedImageUrl = null;
+
+async function onImageFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('imageUploadStatus');
+  const preview = document.getElementById('imagePreview');
+  const hint = document.getElementById('imageUploadHint');
+  status.textContent = 'Загружаю...';
+  preview.style.display = 'none';
+  uploadedImageUrl = null;
+
+  const formData = new FormData();
+  formData.append('image', file);
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/images/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      status.textContent = err.detail || 'Ошибка загрузки';
+      return;
+    }
+    const data = await resp.json();
+    uploadedImageUrl = data.image_url;
+    preview.src = uploadedImageUrl;
+    preview.style.display = 'block';
+    hint.style.display = 'none';
+    status.textContent = file.name;
+  } catch {
+    status.textContent = 'Ошибка загрузки';
+  }
+}
+
+function fillDatalist(id, options) {
+  const dl = document.getElementById(id);
+  dl.innerHTML = options.map(o => `<option value="${esc(o)}">`).join('');
+}
+
+function onGroupInput() {
+  const group = document.getElementById('modalGroup').value.trim();
+  const subgroups = group && CATEGORY_TREE[group] ? Object.keys(CATEGORY_TREE[group]).sort() : [];
+  fillDatalist('listSubgroup', subgroups);
+  document.getElementById('modalSubgroup').value = '';
+  document.getElementById('modalProductType').value = '';
+  fillDatalist('listProductType', []);
+}
+
+function onSubgroupInput() {
+  const group = document.getElementById('modalGroup').value.trim();
+  const subgroup = document.getElementById('modalSubgroup').value.trim();
+  const vids = (group && subgroup && CATEGORY_TREE[group]?.[subgroup]) || [];
+  fillDatalist('listProductType', [...vids].sort());
+  document.getElementById('modalProductType').value = '';
+}
+
+function openAddModal() {
+  document.getElementById('modalTitle').textContent = 'Добавить товар';
+  document.getElementById('modalRawName').value = '';
+  document.getElementById('modalBrand').value = '';
+  document.getElementById('modalGroup').value = '';
+  document.getElementById('modalSubgroup').value = '';
+  document.getElementById('modalProductType').value = '';
+  uploadedImageUrl = null;
+  document.getElementById('modalImageFile').value = '';
+  document.getElementById('imagePreview').style.display = 'none';
+  document.getElementById('imagePreview').src = '';
+  document.getElementById('imageUploadHint').style.display = '';
+  document.getElementById('imageUploadStatus').textContent = '';
+  document.getElementById('modalPrice').value = '';
+  document.getElementById('modalPackage').value = '';
+  document.getElementById('modalMinOrder').value = '';
+  document.getElementById('modalDeliveryMult').value = '';
+  fillDatalist('listGroup', Object.keys(CATEGORY_TREE).sort());
+  fillDatalist('listSubgroup', []);
+  fillDatalist('listProductType', []);
+  const unitSel = document.getElementById('modalUnit');
+  unitSel.innerHTML = '<option value="">—</option>' +
+    ALL_UNITS.map(u => `<option value="${u.id}">${esc(u.code)}</option>`).join('');
+  document.getElementById('modalSaveBtn').textContent = 'Добавить';
+  document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('show');
+}
+
+async function saveFromModal() {
+  const rawName = document.getElementById('modalRawName').value.trim();
+  const brandName = document.getElementById('modalBrand').value.trim();
+  const group = document.getElementById('modalGroup').value.trim();
+  const subgroup = document.getElementById('modalSubgroup').value.trim();
+  const productType = document.getElementById('modalProductType').value.trim();
+  const imageUrl = uploadedImageUrl || null;
+  const price = document.getElementById('modalPrice').value;
+  const unitId = document.getElementById('modalUnit').value;
+  const pkg = document.getElementById('modalPackage').value.trim();
+  const moq = document.getElementById('modalMinOrder').value;
+  const delivMult = document.getElementById('modalDeliveryMult').value;
+
+  if (!rawName) { showToast('Укажите наименование', 'error'); return; }
+
+  const categoryPath = [group, subgroup, productType].filter(Boolean);
+
+  const body = {
+    source_channel: 'web',
+    text: [rawName, price ? price + ' руб' : '', pkg].filter(Boolean).join(', '),
+  };
+
+  try {
+    const uploadResp = await fetch('/supplier/' + SUPPLIER_ID + '/api/uploads/text/', {
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify(body)
+    });
+    if (!uploadResp.ok) throw new Error(await uploadResp.text());
+    const upload = await uploadResp.json();
+
+    const applyBody = {
+      schema_version: 'supplier_price_ai.v1',
+      processing_version: 'web_manual_v1',
+      products: [{
+        row_number: 1,
+        raw_name: rawName,
+        normalized_name: rawName,
+        brand: brandName || null,
+        category_path: categoryPath.length ? categoryPath : undefined,
+        image_url: imageUrl || null,
+        price: price ? Number(price) : null,
+        unit_code: unitId ? ALL_UNITS.find(u => u.id === unitId)?.code : null,
+        package_info: pkg || null,
+        min_order_qty: moq ? Number(moq) : null,
+        multiplicity: delivMult ? Number(delivMult) : null,
+        confidence: 1.0,
+      }]
+    };
+    const applyResp = await fetch('/supplier/' + SUPPLIER_ID + '/api/uploads/' + upload.upload_id + '/apply/', {
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify(applyBody)
+    });
+    if (!applyResp.ok) throw new Error(await applyResp.text());
+
+    const listResp = await fetch('/supplier/' + SUPPLIER_ID + '/api/products/?limit=500', {
+      headers: apiHeaders()
+    });
+    if (listResp.ok) {
+      const data = await listResp.json();
+      const prevMap = {};
+      ALL_PRODUCTS.forEach(p => { prevMap[p.id] = p; });
+      ALL_PRODUCTS = data.results.map(r => ({
+        id: r.id,
+        raw_name: r.supplier_raw_name || '',
+        normalized_name: r.supplier_normalized_name || '',
+        price: r.current_price != null ? String(r.current_price) : '',
+        prev_price: r.prev_price || '',
+        price_changed_at: r.price_changed_at || '',
+        changed: r.changed || false,
+        unit: r.unit || '',
+        unit_id: r.unit_id || '',
+        package: r.package || '',
+        min_order_qty: r.min_order_qty != null ? String(r.min_order_qty) : '',
+        delivery_multiple: r.delivery_multiple != null ? String(r.delivery_multiple) : '',
+        comment: r.comment || '',
+        brand: r.brand || '',
+        category: r.category || '',
+        country: r.country || '',
+        system_sku: r.system_sku || '',
+        image_url: r.image_url || '',
+        group: r.group || '',
+        subgroup: r.subgroup || '',
+        product_type: r.product_type || '',
+      }));
+    }
+
+    closeAddModal();
+    buildGroupFilter();
+    render(getFiltered());
+    showToast('Товар добавлен', 'success');
+  } catch (e) {
+    showToast(errorMsg(e, 'Ошибка добавления'), 'error');
+  }
+}
+
+let timer = null;
+function onSearchInput() {
+  const val = document.getElementById('search').value;
+  document.getElementById('searchClear').classList.toggle('visible', val.length > 0);
+  clearTimeout(timer);
+  timer = setTimeout(() => { currentPage = 1; saveFilters(); render(getFiltered()); }, 200);
+}
+
+function clearSearch() {
+  document.getElementById('search').value = '';
+  document.getElementById('searchClear').classList.remove('visible');
+  currentPage = 1;
+  saveFilters();
+  render(getFiltered());
+}
+
+window.addEventListener('beforeunload', e => {
+  if (editingId) { e.preventDefault(); e.returnValue = ''; }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (editingId) cancelEdit();
+    if (document.getElementById('addModal').classList.contains('show')) closeAddModal();
+    closeLightbox();
+    closePriceHistory();
+  }
+  if (e.key === 'Enter' && editingId) saveRow(editingId);
+});
+
+async function openPriceHistory(productId, productName) {
+  const overlay = document.getElementById('phOverlay');
+  const body = document.getElementById('phBody');
+  const nameEl = document.getElementById('phProductName');
+  nameEl.textContent = productName;
+  body.innerHTML = '<div class="ph-loading">Загружаю...</div>';
+  overlay.classList.add('show');
+
+  try {
+    const resp = await fetch(`/supplier/${SUPPLIER_ID}/api/products/${productId}/prices/`);
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    nameEl.textContent = data.product_name || productName;
+
+    if (!data.history.length) {
+      body.innerHTML = '<div class="ph-empty">История цен пуста</div>';
+      return;
+    }
+
+    body.innerHTML = data.history.map((item, idx) => {
+      const next = data.history[idx + 1];
+      const isCurrent = !item.valid_to;
+      let deltaHtml = '';
+      if (next) {
+        const cur = parseFloat(item.price), prev = parseFloat(next.price);
+        const diff = cur - prev;
+        const pct = Math.abs((diff / prev) * 100).toFixed(1);
+        if (diff !== 0) {
+          const cls = diff > 0 ? 'up' : 'down';
+          const sign = diff > 0 ? '+' : '−';
+          deltaHtml = `<span class="ph-delta ${cls}">${sign}${pct}%</span>`;
+        }
+      }
+      const oldPriceHtml = next
+        ? `<span class="ph-price-old">${fmtPrice(next.price)}</span>` : '';
+      const dateStr = isCurrent
+        ? `с ${esc(item.valid_from)}`
+        : `${esc(item.valid_from)} — ${esc(item.valid_to)}`;
+
+      return `<div class="ph-item${isCurrent ? ' ph-current' : ''}">
+        ${isCurrent ? '<div class="ph-label-current">Текущая</div>' : ''}
+        <div class="ph-price-row">
+          <span class="ph-price">${fmtPrice(item.price)}</span>
+          ${oldPriceHtml}
+          ${deltaHtml}
+        </div>
+        <div class="ph-date">${dateStr}</div>
+      </div>`;
+    }).join('');
+  } catch {
+    body.innerHTML = '<div class="ph-empty">Ошибка загрузки</div>';
+  }
+}
+
+function closePriceHistory() {
+  document.getElementById('phOverlay').classList.remove('show');
+}
+
+function openLightbox(url) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src = url;
+  lb.classList.add('show');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('show');
+}
+
+loadFilters();
+buildGroupFilter();
+render(getFiltered());
+syncUrl(document.getElementById('search').value);
+</script>
+
+<div class="ph-overlay" id="phOverlay">
+  <div class="ph-backdrop" onclick="closePriceHistory()"></div>
+  <div class="ph-drawer">
+    <button class="ph-close" onclick="closePriceHistory()">✕</button>
+    <div class="ph-header">
+      <h3>История изменения цены</h3>
+      <div class="ph-product" id="phProductName"></div>
+    </div>
+    <div class="ph-body" id="phBody">
+      <div class="ph-loading">Загружаю...</div>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close" onclick="closeLightbox()">✕</span>
+  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()">
+</div>
+</body>
+</html>

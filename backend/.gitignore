@@ -1,0 +1,33 @@
+.obsidian/
+raw/
+raw_local/
+raw_vault/
+.idea/
+.vscode/
+
+# Django
+db.sqlite3
+*.pyc
+__pycache__/
+media/
+var/
+staticfiles/
+
+# Excel lock files
+~$*.xlsx
+~$*.xls
+~$*.xlsm
+
+# Env
+.env
+*.local
+
+# Git worktrees
+.worktrees/
+coverage
+tmp
+
+# Raw files (supplier price lists, cards) belong in project_raw/, not the repo root
+/*.xlsx
+/*.xls
+/*.pdf

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>QA: Поделиться доступом (owner vs manager)</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin-top: 28px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  p.hint { color: #666; font-size: 13px; }
+  button { cursor: pointer; padding: 6px 12px; border: 1px solid #999; border-radius: 4px; background: #f5f5f5; font-size: 13px; }
+  button:hover { background: #eee; }
+  button.danger { border-color: #c0392b; color: #c0392b; background: #fff0ef; }
+  button.primary { border-color: #2c6ecb; color: #2c6ecb; background: #eef4ff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #fafafa; }
+  .pass { color: #1a7f37; font-weight: 600; }
+  .fail { color: #c0392b; font-weight: 600; }
+  .pending { color: #999; }
+  pre { white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; font-size: 11px; max-height: 120px; overflow: auto; background: #fafafa; padding: 4px 6px; border-radius: 3px; }
+  #state { font-family: monospace; font-size: 12px; background: #fafafa; padding: 8px; border-radius: 4px; white-space: pre-wrap; }
+  .row-actions { display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+
+<h1>QA: «Поделиться доступом» — owner vs manager</h1>
+<p class="hint">
+  Только для DEBUG-стенда (эта страница и <code>/api/v1/qa/share-access/seed</code> отдают 404, если
+  <code>settings.DEBUG</code> выключен). Бьёт по реальным продовым эндпоинтам с реальными JWT — не мок.
+  Каждая строка сравнивает фактический HTTP-статус с ожидаемым для этой роли (owner/manager).
+</p>
+
+<h2>0. Тестовые данные</h2>
+<p class="hint">Создаёт свежую компанию + owner + manager, логинит обоих через настоящий cabinet/session-from-login.</p>
+<button class="primary" onclick="seed()">Создать компанию + owner + manager</button>
+<div id="state">Ещё не создано.</div>
+
+<h2>1. Список участников / приглашение</h2>
+<table id="table-team"></table>
+
+<h2>2. PATCH cabinet/me — обычные vs owner-only поля</h2>
+<table id="table-patch"></table>
+
+<h2>3. Банковские счета</h2>
+<table id="table-bank"></table>
+
+<h2>4. Отзыв доступа</h2>
+<table id="table-revoke"></table>
+
+<h2>5. Удаление компании (owner-only, необратимо в рамках этой страницы)</h2>
+<table id="table-delete"></table>
+
+<script>
+const API = "/api/v1";
+let state = {};
+
+function renderState() {
+  document.getElementById("state").textContent = Object.keys(state).length
+    ? JSON.stringify(state, null, 2)
+    : "Ещё не создано.";
+}
+
+async function call(method, path, token, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const resp = await fetch(API + path, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  let data = null;
+  try { data = await resp.json(); } catch (e) { /* no body, e.g. 204 */ }
+  return { status: resp.status, data };
+}
+
+async function seed() {
+  const seedResp = await call("POST", "/qa/share-access/seed", null);
+  if (seedResp.status !== 201) {
+    alert("Seed failed: " + seedResp.status + " " + JSON.stringify(seedResp.data));
+    return;
+  }
+  const d = seedResp.data;
+  state = {
+    supplier_id: d.supplier_id,
+    supplier_display_name: d.supplier_display_name,
+    owner_user_id: d.owner.user_id,
+    owner_core_jwt: d.owner.core_jwt,
+    manager_user_id: d.manager.user_id,
+    manager_core_jwt: d.manager.core_jwt,
+  };
+
+  const ownerSession = await call("POST", "/suppliers/cabinet/session-from-login", state.owner_core_jwt, {});
+  state.owner_cabinet_jwt = ownerSession.data && ownerSession.data.access;
+
+  const managerSession = await call("POST", "/suppliers/cabinet/session-from-login", state.manager_core_jwt, {});
+  state.manager_cabinet_jwt = managerSession.data && managerSession.data.access;
+
+  renderState();
+  buildAllTables();
+}
+
+function stepRow(tableId, step) {
+  const table = document.getElementById(tableId);
+  const row = document.createElement("tr");
+  const resultCell = document.createElement("td");
+  resultCell.innerHTML = '<span class="pending">не запущено</span>';
+  const respCell = document.createElement("td");
+
+  row.innerHTML = `<td>${step.label}</td><td>ожидание: <b>${step.expected}</b></td>`;
+  const actionCell = document.createElement("td");
+  const btn = document.createElement("button");
+  btn.textContent = "Выполнить";
+  if (step.danger) btn.className = "danger";
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      const result = await step.run(state);
+      const ok = result.status === step.expected;
+      resultCell.innerHTML = ok
+        ? `<span class="pass">OK (${result.status})</span>`
+        : `<span class="fail">FAIL (получено ${result.status})</span>`;
+      respCell.innerHTML = `<pre>${JSON.stringify(result.data, null, 1)}</pre>`;
+      if (step.onResult) step.onResult(result, state);
+    } catch (e) {
+      resultCell.innerHTML = `<span class="fail">ERROR</span>`;
+      respCell.innerHTML = `<pre>${e}</pre>`;
+    }
+    btn.disabled = false;
+  };
+  actionCell.appendChild(btn);
+  row.appendChild(actionCell);
+  row.appendChild(resultCell);
+  row.appendChild(respCell);
+  table.appendChild(row);
+}
+
+function tableHeader(tableId) {
+  const table = document.getElementById(tableId);
+  table.innerHTML = "<tr><th>Шаг</th><th>Ожидаемый статус</th><th>Действие</th><th>Результат</th><th>Ответ</th></tr>";
+}
+
+function buildAllTables() {
+  const s = () => state; // always read latest
+
+  tableHeader("table-team");
+  [
+    { label: "GET /suppliers/{id}/users — owner", expected: 200,
+      run: (st) => call("GET", `/suppliers/${st.supplier_id}/users`, st.owner_core_jwt) },
+    { label: "GET /suppliers/{id}/users — manager (должен получить 403)", expected: 403,
+      run: (st) => call("GET", `/suppliers/${st.supplier_id}/users`, st.manager_core_jwt) },
+    { label: "POST /suppliers/{id}/invites — owner", expected: 201,
+      run: (st) => call("POST", `/suppliers/${st.supplier_id}/invites`, st.owner_core_jwt,
+        { target_email: "qa-invitee-" + Date.now() + "@example.com" }) },
+    { label: "POST /suppliers/{id}/invites — manager (должен получить 403)", expected: 403,
+      run: (st) => call("POST", `/suppliers/${st.supplier_id}/invites`, st.manager_core_jwt,
+        { target_email: "qa-invitee-blocked-" + Date.now() + "@example.com" }) },
+  ].forEach((step) => stepRow("table-team", step));
+
+  tableHeader("table-patch");
+  [
+    { label: "PATCH cabinet/me {description} — owner (обычное поле)", expected: 200,
+      run: (st) => call("PATCH", "/suppliers/cabinet/me", st.owner_cabinet_jwt, { description: "QA: обычное поле, owner" }) },
+    { label: "PATCH cabinet/me {description} — manager (обычное поле, тоже разрешено)", expected: 200,
+      run: (st) => call("PATCH", "/suppliers/cabinet/me", st.manager_cabinet_jwt, { description: "QA: обычное поле, manager" }) },
+    { label: "PATCH cabinet/me {inn} — owner (owner-only поле)", expected: 200,
+      run: (st) => call("PATCH", "/suppliers/cabinet/me", st.owner_cabinet_jwt, { inn: "7707083893" }) },
+    { label: "PATCH cabinet/me {inn} — manager (owner-only поле, должен получить 403)", expected: 403,
+      run: (st) => call("PATCH", "/suppliers/cabinet/me", st.manager_cabinet_jwt, { inn: "5410000000" }) },
+  ].forEach((step) => stepRow("table-patch", step));
+
+  tableHeader("table-bank");
+  [
+    { label: "GET cabinet/bank-accounts — manager (просмотр разрешён всем)", expected: 200,
+      run: (st) => call("GET", "/suppliers/cabinet/bank-accounts", st.manager_cabinet_jwt) },
+    { label: "POST cabinet/bank-accounts — manager (должен получить 403)", expected: 403,
+      run: (st) => call("POST", "/suppliers/cabinet/bank-accounts", st.manager_cabinet_jwt,
+        { bank_name: "QA Bank (manager, blocked)", account_number: "40702810000000000098", bik: "044525974" }) },
+    { label: "POST cabinet/bank-accounts — owner", expected: 201,
+      run: (st) => call("POST", "/suppliers/cabinet/bank-accounts", st.owner_cabinet_jwt,
+        { bank_name: "QA Bank (owner)", account_number: "40702810000000000099", bik: "044525225" }),
+      onResult: (result) => { if (result.data && result.data.id) state.bank_account_id = result.data.id; } },
+    { label: "PATCH bank-account — manager (должен получить 403)", expected: 403,
+      run: (st) => {
+        if (!st.bank_account_id) return Promise.resolve({ status: 0, data: "сначала создайте счёт (шаг выше)" });
+        return call("PATCH", `/suppliers/cabinet/bank-accounts/${st.bank_account_id}`, st.manager_cabinet_jwt, { bank_name: "Hacked" });
+      } },
+    { label: "DELETE bank-account — owner", expected: 204,
+      run: (st) => {
+        if (!st.bank_account_id) return Promise.resolve({ status: 0, data: "сначала создайте счёт (шаг выше)" });
+        return call("DELETE", `/suppliers/cabinet/bank-accounts/${st.bank_account_id}`, st.owner_cabinet_jwt);
+      } },
+  ].forEach((step) => stepRow("table-bank", step));
+
+  tableHeader("table-revoke");
+  [
+    { label: "POST users/{owner}/revoke — manager пытается отозвать owner'а (должен получить 403)", expected: 403,
+      run: (st) => call("POST", `/suppliers/${st.supplier_id}/users/${st.owner_user_id}/revoke`, st.manager_core_jwt) },
+    { label: "POST users/{owner}/revoke — owner пытается отозвать сам себя (должен получить 400)", expected: 400,
+      run: (st) => call("POST", `/suppliers/${st.supplier_id}/users/${st.owner_user_id}/revoke`, st.owner_core_jwt) },
+    { label: "POST users/{manager}/revoke — owner отзывает manager'а", expected: 200,
+      run: (st) => call("POST", `/suppliers/${st.supplier_id}/users/${st.manager_user_id}/revoke`, st.owner_core_jwt) },
+    { label: "GET /suppliers/{id}/users — owner (должен остаться один участник)", expected: 200,
+      run: (st) => call("GET", `/suppliers/${st.supplier_id}/users`, st.owner_core_jwt) },
+  ].forEach((step) => stepRow("table-revoke", step));
+
+  tableHeader("table-delete");
+  [
+    { label: "DELETE cabinet/me — manager (должен получить 403)", expected: 403, danger: true,
+      run: (st) => call("DELETE", "/suppliers/cabinet/me", st.manager_cabinet_jwt) },
+    { label: "DELETE cabinet/me — owner (реально удаляет тестовую компанию, необратимо в рамках этой страницы)", expected: 204, danger: true,
+      run: (st) => call("DELETE", "/suppliers/cabinet/me", st.owner_cabinet_jwt) },
+  ].forEach((step) => stepRow("table-delete", step));
+}
+
+buildAllTables();
+</script>
+</body>
+</html>

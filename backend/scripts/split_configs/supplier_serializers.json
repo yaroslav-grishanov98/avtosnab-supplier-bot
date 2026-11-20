@@ -1,0 +1,71 @@
+{
+  "module": "api/v1/suppliers/serializers.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py",
+    "autosnab_bots/**/*.py"
+  ],
+  "groups": {
+    "common": [
+      "AuditLogEntrySerializer",
+      "PackageCompositionSerializer",
+      "_validate_import_upload_size",
+      "SupplierImageSerializer",
+      "SupplierLogoUploadSerializer",
+      "Supplier(Address|Contact|BankAccount|ScheduleRule)Serializer"
+    ],
+    "reference": [
+      "Supplier(Unit|Country|Brand|Category)(ListQuery)?Serializer"
+    ],
+    "products": [
+      "SupplierProduct(Image|ListQuery|ListItem|PriceHistoryItem|Create|Update|Autofill|Bulk|ArchiveAll|DeleteAll|RestoreAll).*",
+      "SupplierCatalogSearchEventSerializer"
+    ],
+    "price_uploads": [
+      "SupplierPrice.*",
+      "BotSupplierPriceUploadTextSerializer"
+    ],
+    "bot": [
+      "BotUser.*",
+      "BotPendingAction.*"
+    ],
+    "team": [
+      "SupplierAccountTransfer.*",
+      "SupplierUser.*",
+      "SupplierInviteLink.*",
+      "SupplierJoinRequest.*"
+    ],
+    "registration": [
+      "SupplierInnLookup.*",
+      "SupplierAddressLookup.*",
+      "SupplierAddressSuggestion.*",
+      "SupplierSearchByInn.*",
+      "SupplierListQuerySerializer",
+      "SupplierCreateSerializer",
+      "SupplierDetailSerializer"
+    ],
+    "cabinet": [
+      "SupplierCabinet.*",
+      "SupplierBot(Connection|Link|LoginConfirm|AccountConfirm|ConnectionsList).*"
+    ],
+    "product_import": [
+      "SupplierProductImport.*"
+    ]
+  },
+  "docstrings": {
+    "common": "Serializers shared across supplier domains.",
+    "reference": "Reference lists for the supplier cabinet.",
+    "products": "Supplier products: list, card, images, autofill and bulk actions.",
+    "price_uploads": "Legacy supplier price uploads.",
+    "bot": "Telegram bot user binding, pending actions and state.",
+    "team": "Supplier team: members, invites, invite links, join requests, account transfer.",
+    "registration": "Supplier registration, INN/address lookup and supplier search.",
+    "cabinet": "Supplier cabinet session, settings and bot connections.",
+    "product_import": "Unified supplier product import.",
+    "_shared": "Helpers shared by several supplier serializer modules."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "syr_2019.xlsx": {
+    "rows": 73,
+    "with_numeric_price": 73,
+    "with_price": 73,
+    "with_sku": 1,
+    "with_unit": 73
+  },
+  "Левина ИП Бакалея Прайс Бакалея Февраль 22.05.26.xls": {
+    "rows": 566,
+    "with_numeric_price": 566,
+    "with_price": 566,
+    "with_sku": 0,
+    "with_unit": 530
+  },
+  "Левина ИП Бакалея Прайс Бакалея Февраль 22.05.26.xlsx": {
+    "duplicate_names": 0,
+    "rows": 566,
+    "unpriced_rows": 0,
+    "with_numeric_price": 566,
+    "with_price": 566,
+    "with_sku": 0,
+    "with_unit": 566
+  },
+  "Левина ИП Охлажденка Прайс Охлажденка Хорека Январь 22.05.26.xls": {
+    "duplicate_names": 0,
+    "rows": 285,
+    "unpriced_rows": 17,
+    "with_numeric_price": 268,
+    "with_price": 268,
+    "with_sku": 0,
+    "with_unit": 285
+  },
+  "Натурово Прайс 25.05.26.xlsx": {
+    "duplicate_names": 2,
+    "rows": 259,
+    "unpriced_rows": 5,
+    "with_numeric_price": 254,
+    "with_price": 254,
+    "with_sku": 0,
+    "with_unit": 259
+  },
+  "Очаково (ООО Компания Цефей, ООО Мэджик, ИП Иванов О.Н.) Прайс-лист 22.05.26.xlsx": {
+    "duplicate_names": 0,
+    "rows": 2099,
+    "unpriced_rows": 12,
+    "with_numeric_price": 2087,
+    "with_price": 2087,
+    "with_sku": 0,
+    "with_unit": 2088
+  },
+  "Прайс ПРОФУД МАЙ.xlsx": {
+    "rows": 360,
+    "with_numeric_price": 222,
+    "with_price": 360,
+    "with_sku": 0,
+    "with_unit": 358
+  },
+  "Справочник товаров ООО Лир.xlsx": {
+    "rows": 749,
+    "with_numeric_price": 0,
+    "with_price": 0,
+    "with_sku": 0,
+    "with_unit": 749
+  }
+}

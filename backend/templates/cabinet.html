@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if supplier %}{{ supplier.display_name }} — Кабинет{% else %}Кабинет{% endif %} | АвтоСнаб</title>
+  {% if yandex_maps_key %}<script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_key }}&lang=ru_RU" type="text/javascript"></script>{% endif %}
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FBFF; color: #1a1a2e; font-size: 14px; }
+
+    .nav { height: 56px; background: #fff; border-bottom: 1px solid #E4E7EC; padding: 0 32px; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .nav-logo { font-size: 16px; font-weight: 600; color: #1568F7; display: flex; align-items: center; gap: 8px; }
+    .nav-logo svg { width: 24px; height: 24px; }
+    .nav-supplier { margin-left: auto; font-size: 14px; color: #667085; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 24px 32px; }
+    .error-box { background: #FFF0F0; border: 1px solid #FECACA; border-radius: 8px; padding: 24px; text-align: center; margin-top: 40px; }
+    .error-box p { color: #991B1B; font-size: 16px; }
+
+    .card { background: #fff; border: 1px solid #E4E7EC; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .card-header h2 { font-size: 16px; font-weight: 600; color: #1a1a2e; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat { background: #F8FBFF; border: 1px solid #E4E7EC; border-radius: 6px; padding: 12px; text-align: center; }
+    .stat-value { font-size: 24px; font-weight: 600; color: #1568F7; }
+    .stat-label { font-size: 12px; color: #667085; margin-top: 4px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; transition: background .15s; }
+    .btn-primary { background: #1568F7; color: #fff; }
+    .btn-primary:hover { background: #1250D0; }
+    .btn-ghost { background: transparent; border: 1px solid #D0D5DD; color: #344054; }
+    .btn-ghost:hover { background: #F0F2F5; }
+    .btn-danger-text { background: none; border: none; color: #FF3B30; font-size: 12px; cursor: pointer; padding: 2px 4px; }
+    .btn-danger-text:hover { text-decoration: underline; }
+    .btn-link { background: none; border: none; color: #1568F7; font-size: 13px; cursor: pointer; padding: 0; }
+    .btn-link:hover { text-decoration: underline; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { padding: 8px 12px; text-align: left; font-weight: 500; font-size: 12px; color: #667085; border-bottom: 1px solid #E4E7EC; }
+    td { padding: 8px 12px; border-bottom: 1px solid #F0F2F5; color: #344054; }
+    tr:hover td { background: #F8FBFF; }
+    .status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .status-applied { background: #ECFDF5; color: #065F46; }
+    .status-processing { background: #FEF3C7; color: #92400E; }
+    .status-failed { background: #FEE2E2; color: #991B1B; }
+    .status-received { background: #EBF1FF; color: #1568F7; }
+
+    /* View info grid */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .info-item { padding: 6px 0; border-bottom: 1px solid #F0F2F5; }
+    .info-item:last-child, .info-item:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+    .info-label { font-size: 11px; color: #667085; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .4px; }
+    .info-value { font-size: 14px; color: #1a1a2e; }
+
+    /* Modal overlay */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 900; justify-content: center; align-items: center; }
+    .modal-overlay.show { display: flex; }
+
+    /* Company card modal */
+    .cc-modal { background: #fff; border-radius: 12px; width: 90%; max-width: 660px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,0.18); }
+    .cc-modal-header { padding: 20px 24px 16px; border-bottom: 1px solid #E4E7EC; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .cc-modal-header h2 { font-size: 18px; font-weight: 600; color: #1a1a2e; }
+    .cc-modal-close { width: 32px; height: 32px; border: none; background: none; cursor: pointer; font-size: 20px; color: #667085; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+    .cc-modal-close:hover { background: #F0F2F5; }
+    .cc-modal-body { flex: 1; overflow-y: auto; padding: 0; }
+    .cc-modal-footer { padding: 16px 24px; border-top: 1px solid #E4E7EC; display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+
+    /* Sections */
+    .cc-section { border-bottom: 1px solid #E4E7EC; }
+    .cc-section:last-child { border-bottom: none; }
+    .cc-section-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; cursor: pointer; user-select: none; }
+    .cc-section-header:hover { background: #F8FBFF; }
+    .cc-section-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+    .cc-chevron { transition: transform .2s; flex-shrink: 0; }
+    .cc-section.open .cc-chevron { transform: rotate(180deg); }
+    .cc-section-body { display: none; padding: 0 24px 20px; }
+    .cc-section.open .cc-section-body { display: block; }
+
+    /* Fields */
+    .cc-field { margin-bottom: 12px; }
+    .cc-field label { display: block; font-size: 12px; font-weight: 500; color: #667085; margin-bottom: 4px; }
+    .cc-field label .req { color: #FF3B30; }
+    .cc-field input, .cc-field select, .cc-field textarea { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 13px; color: #1a1a2e; background: #fff; outline: none; font-family: inherit; }
+    .cc-field input:focus, .cc-field select:focus { border-color: #1568F7; }
+    .cc-field textarea { height: 72px; padding: 8px 10px; resize: vertical; }
+    .cc-row { display: grid; gap: 10px; }
+    .cc-row-2 { grid-template-columns: 1fr 1fr; }
+    .cc-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .cc-row-amt { grid-template-columns: 1fr 140px; }
+
+    /* Expandable block (address / requisites) */
+    .cc-expand-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .cc-expand-label { font-size: 13px; font-weight: 500; color: #344054; }
+    .cc-expand-brief { font-size: 12px; color: #667085; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cc-expand-btn { font-size: 12px; color: #1568F7; border: none; background: none; cursor: pointer; white-space: nowrap; }
+    .cc-expand-btn:hover { text-decoration: underline; }
+    .cc-expand-body { background: #F8FBFF; border: 1px solid #E4E7EC; border-radius: 6px; padding: 14px; margin-bottom: 12px; }
+
+    /* Contacts */
+    .cc-contact-block { border: 1px solid #E4E7EC; border-radius: 8px; padding: 14px; margin-bottom: 12px; position: relative; }
+    .cc-contact-title { font-size: 12px; font-weight: 600; color: #667085; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 12px; }
+    .cc-multi-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .cc-multi-row input, .cc-multi-row select { flex: 1; height: 34px; padding: 0 8px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 13px; outline: none; }
+    .cc-multi-row input:focus, .cc-multi-row select:focus { border-color: #1568F7; }
+    .cc-multi-row .cc-remove-btn { width: 28px; height: 28px; border: none; background: none; cursor: pointer; color: #8E8E93; font-size: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+    .cc-multi-row .cc-remove-btn:hover { background: #FEE2E2; color: #FF3B30; }
+    .cc-add-link { font-size: 12px; color: #1568F7; cursor: pointer; border: none; background: none; padding: 0; }
+    .cc-add-link:hover { text-decoration: underline; }
+
+    /* Schedule */
+    .cc-schedule { width: 100%; font-size: 12px; border-collapse: collapse; margin-top: 8px; }
+    .cc-schedule th { font-size: 11px; color: #667085; font-weight: 500; padding: 4px 6px; text-align: left; border-bottom: 1px solid #E4E7EC; }
+    .cc-schedule td { padding: 5px 6px; vertical-align: middle; }
+    .cc-schedule input[type="time"] { width: 80px; height: 30px; padding: 0 6px; border: 1px solid #D0D5DD; border-radius: 4px; font-size: 12px; outline: none; }
+    .cc-schedule input[type="time"]:focus { border-color: #1568F7; }
+    .cc-schedule select { height: 30px; padding: 0 4px; border: 1px solid #D0D5DD; border-radius: 4px; font-size: 12px; outline: none; min-width: 110px; }
+    .cc-schedule select:focus { border-color: #1568F7; }
+    .cc-schedule-day { font-size: 12px; color: #344054; white-space: nowrap; }
+    .cc-schedule tr.disabled td { opacity: .45; }
+
+    /* Toggle switch */
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #D0D5DD; border-radius: 20px; cursor: pointer; transition: background .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .toggle input:checked + .toggle-slider { background: #1568F7; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* Map modal */
+    .map-modal { display:none; position:fixed; inset:0; z-index:3000; background:rgba(0,0,0,0.55); justify-content:center; align-items:center; }
+    .map-modal.show { display:flex; }
+    .map-wrap { background:#fff; border-radius:12px; width:92%; max-width:760px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,0.22); }
+    .map-head { padding:14px 18px; border-bottom:1px solid #E4E7EC; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .map-head h3 { font-size:15px; font-weight:600; white-space:nowrap; }
+    .map-search-input { flex:1; height:34px; padding:0 10px; border:1px solid #D0D5DD; border-radius:6px; font-size:13px; outline:none; }
+    .map-search-input:focus { border-color:#1568F7; }
+    .map-results { max-height:150px; overflow-y:auto; border-bottom:1px solid #E4E7EC; display:none; }
+    .map-result-item { padding:8px 18px; font-size:13px; cursor:pointer; border-bottom:1px solid #F0F2F5; color:#344054; }
+    .map-result-item:hover { background:#F8FBFF; color:#1568F7; }
+    #mapContainer { height:420px; }
+    .map-foot { padding:12px 18px; border-top:1px solid #E4E7EC; display:flex; gap:8px; align-items:center; flex-shrink:0; }
+    .map-foot-addr { flex:1; font-size:12px; color:#667085; }
+    /* Map button inside expand body */
+    .cc-map-inline-btn { display:inline-flex; align-items:center; gap:5px; margin-bottom:10px; padding:6px 12px; border:1px solid #D0D5DD; border-radius:6px; font-size:12px; color:#344054; background:#fff; cursor:pointer; }
+    .cc-map-inline-btn:hover { border-color:#1568F7; color:#1568F7; background:#EBF1FF; }
+    /* Legal same checkbox */
+    .cc-same-check { display:flex; align-items:center; gap:8px; margin:10px 0 6px; font-size:13px; cursor:pointer; color:#344054; }
+    .cc-same-check input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:#1568F7; }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 2000; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .toast-success { background: #22C55E; }
+    .toast-error { background: #FF3B30; }
+
+    /* Upload drop zone */
+    .upload-zone { border: 2px dashed #D0D5DD; border-radius: 8px; padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 16px; }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: #1568F7; background: #EBF1FF; }
+    .upload-zone.uploading { border-color: #F59E0B; background: #FFFBEB; cursor: default; }
+    .upload-zone.done { border-color: #22C55E; background: #F0FDF4; cursor: default; }
+    .upload-zone-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-zone-text { font-size: 14px; color: #344054; font-weight: 500; }
+    .upload-zone-sub { font-size: 12px; color: #667085; margin-top: 4px; }
+    .upload-progress { margin-top: 12px; display: none; }
+    .upload-progress-bar { height: 6px; background: #E4E7EC; border-radius: 3px; overflow: hidden; }
+    .upload-progress-fill { height: 100%; background: #1568F7; border-radius: 3px; transition: width .3s; width: 0%; }
+    .upload-progress-label { font-size: 12px; color: #667085; margin-top: 6px; }
+
+    @media (max-width: 768px) {
+      .container { padding: 16px; }
+      .nav { padding: 0 16px; }
+      .info-grid { grid-template-columns: 1fr; }
+      .cc-row-2, .cc-row-3 { grid-template-columns: 1fr; }
+      .cc-row-amt { grid-template-columns: 1fr; }
+      .cc-modal { width: 100%; max-width: 100%; max-height: 100vh; border-radius: 0; }
+      .cc-schedule { font-size: 11px; }
+      .cc-schedule input[type="time"] { width: 68px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1568F7" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg>
+    АвтоСнаб
+  </div>
+  {% if supplier %}<span class="nav-supplier">{{ supplier.display_name }}</span>{% endif %}
+</nav>
+
+<div class="container">
+{% if error %}
+  <div class="error-box"><p>{{ error }}</p></div>
+{% else %}
+
+  <!-- Карточка компании: режим просмотра -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Карточка поставщика</h2>
+      <button class="btn btn-ghost" onclick="openCardModal()">Редактировать</button>
+    </div>
+    <div id="cardView">
+      <div class="info-grid" id="infoGrid">
+        <!-- заполняется JS -->
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-value">{{ products_count }}</div><div class="stat-label">Товаров</div></div>
+    <div class="stat"><div class="stat-value">{{ uploads|length }}</div><div class="stat-label">Загрузок</div></div>
+    {% if last_upload_at %}
+    <div class="stat"><div class="stat-value" style="font-size:14px;font-weight:600;">{{ last_upload_at }}</div><div class="stat-label">Последний прайс</div></div>
+    {% endif %}
+  </div>
+
+  <a href="{{ supplier_page_url }}" class="btn btn-primary" style="margin-bottom:16px;">Мои товары</a>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Загрузка прайса</h2>
+    </div>
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <input type="file" id="fileInput" style="display:none" accept=".xlsx,.csv,.pdf,.docx,.doc,.txt" onchange="uploadFile(this.files[0])">
+      <div class="upload-zone-icon" id="uploadIcon">📄</div>
+      <div class="upload-zone-text" id="uploadText">Нажмите или перетащите файл прайса</div>
+      <div class="upload-zone-sub" id="uploadSub">Форматы: XLSX, CSV, PDF, DOCX, TXT</div>
+      <div class="upload-progress" id="uploadProgress">
+        <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadFill"></div></div>
+        <div class="upload-progress-label" id="uploadLabel">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>История загрузок</h2>
+      <button class="btn btn-ghost" style="font-size:12px;" onclick="location.reload()">Обновить</button>
+    </div>
+    {% if uploads %}
+    <table>
+      <thead><tr><th>Файл</th><th>Дата</th><th>Статус</th><th>Позиций</th><th>Новых</th><th>Цен</th></tr></thead>
+      <tbody id="uploadsTableBody">
+        {% for u in uploads %}
+        <tr id="urow-{{ u.id }}"{% if u.error_message %} style="cursor:pointer;" onclick="toggleUploadError('err-{{ u.id }}')" title="Нажмите чтобы увидеть детали ошибки"{% endif %}>
+          <td>{{ u.file }}</td>
+          <td>{{ u.date }}</td>
+          <td><span class="status status-{{ u.status }}" id="ustatus-{{ u.id }}">{% if u.status == "applied" %}Обработан{% elif u.status == "processing" %}Обработка...{% elif u.status == "failed" %}Ошибка{% elif u.status == "received" %}Получен{% elif u.status == "needs_review" %}На проверке{% else %}{{ u.status }}{% endif %}</span>{% if u.error_message %} <span style="color:#9CA3AF;font-size:11px;">▼</span>{% endif %}</td>
+          <td id="uitems-{{ u.id }}">{{ u.items_total }}</td><td id="ucreated-{{ u.id }}">{{ u.products_created }}</td><td id="uprices-{{ u.id }}">{{ u.prices_created }}</td>
+        </tr>
+        {% if u.error_message %}
+        <tr id="err-{{ u.id }}" style="display:none;">
+          <td colspan="6" style="background:#FFF5F5;padding:10px 16px;font-size:12px;color:#991B1B;white-space:pre-wrap;font-family:monospace;">{{ u.error_message }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#667085;" id="noUploadsMsg">Загрузок пока нет.</p>
+    {% endif %}
+  </div>
+
+{% endif %}
+</div>
+
+<!-- Модальное окно: карточка поставщика -->
+<div class="modal-overlay" id="cardModal">
+  <div class="cc-modal">
+    <div class="cc-modal-header">
+      <h2>Карточка поставщика</h2>
+      <button class="cc-modal-close" onclick="closeCardModal()">✕</button>
+    </div>
+    <div class="cc-modal-body">
+
+      <!-- Секция 1: Основная информация -->
+      <div class="cc-section open" id="sec-main">
+        <div class="cc-section-header" onclick="toggleSection('sec-main')">
+          <span class="cc-section-title">Основная информация</span>
+          <svg class="cc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cc-section-body">
+          <div class="cc-row cc-row-2">
+            <div class="cc-field">
+              <label>Торговое название <span class="req">*</span></label>
+              <input type="text" id="cc-display-name" placeholder="АвтоСнаб">
+            </div>
+            <div class="cc-field">
+              <label>Юридическое название</label>
+              <input type="text" id="cc-legal-name" placeholder="ООО «АвтоСнаб»">
+            </div>
+          </div>
+          <div class="cc-field" style="max-width:320px;">
+            <label>ИНН <span class="req">*</span></label>
+            <input type="text" id="cc-inn" placeholder="Введите ИНН">
+          </div>
+
+          <!-- Адрес -->
+          <div>
+            <div class="cc-expand-header">
+              <span class="cc-expand-label">Адрес</span>
+              <span class="cc-expand-brief" id="addr-brief">—</span>
+              <button class="cc-expand-btn" onclick="toggleExpand('addr')">Раскрыть</button>
+            </div>
+            <div id="addr-body" style="display:none;">
+              <div class="cc-expand-body">
+                {% if yandex_maps_key %}<button type="button" class="cc-map-inline-btn" onclick="openMapPicker('addr')">📍 Указать на карте</button>{% endif %}
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Почтовый индекс</label><input id="cc-addr-index" type="text" placeholder="123456"></div>
+                  <div class="cc-field"><label>Страна</label><input id="cc-addr-country" type="text" value="Россия"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Регион</label><input id="cc-addr-region" type="text"></div>
+                  <div class="cc-field"><label>Район</label><input id="cc-addr-district" type="text"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Населённый пункт</label><input id="cc-addr-city" type="text"></div>
+                  <div class="cc-field"><label>Улица, номер дома</label><input id="cc-addr-street" type="text"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Квартира / офис / этаж</label><input id="cc-addr-apt" type="text"></div>
+                  <div class="cc-field"><label>Тип адреса</label>
+                    <select id="cc-addr-type">
+                      <option>Юридический адрес</option>
+                      <option>Фактический адрес</option>
+                      <option>Домашний адрес</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Юридический адрес -->
+          <label class="cc-same-check">
+            <input type="checkbox" id="cc-legal-same" onchange="toggleLegalSame(this)">
+            Юридический адрес совпадает с фактическим
+          </label>
+          <div id="cc-legal-addr-wrap" style="display:none;">
+            <div class="cc-expand-header">
+              <span class="cc-expand-label">Юридический адрес</span>
+              <span class="cc-expand-brief" id="legal-addr-brief">—</span>
+              <button class="cc-expand-btn" onclick="toggleExpand('legal-addr')">Раскрыть</button>
+            </div>
+            <div id="legal-addr-body" style="display:none;">
+              <div class="cc-expand-body">
+                {% if yandex_maps_key %}<button type="button" class="cc-map-inline-btn" onclick="openMapPicker('laddr')">📍 Указать на карте</button>{% endif %}
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Почтовый индекс</label><input id="cc-laddr-index" type="text" placeholder="123456"></div>
+                  <div class="cc-field"><label>Страна</label><input id="cc-laddr-country" type="text" value="Россия"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Регион</label><input id="cc-laddr-region" type="text"></div>
+                  <div class="cc-field"><label>Район</label><input id="cc-laddr-district" type="text"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>Населённый пункт</label><input id="cc-laddr-city" type="text"></div>
+                  <div class="cc-field"><label>Улица, номер дома</label><input id="cc-laddr-street" type="text"></div>
+                </div>
+                <div class="cc-field"><label>Квартира / офис / этаж</label><input id="cc-laddr-apt" type="text"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Реквизиты -->
+          <div>
+            <div class="cc-expand-header">
+              <span class="cc-expand-label">Реквизиты <span class="req" style="color:#FF3B30;">*</span></span>
+              <span class="cc-expand-brief" id="req-brief">—</span>
+              <button class="cc-expand-btn" onclick="toggleExpand('req')">Раскрыть</button>
+            </div>
+            <div id="req-body" style="display:none;">
+              <div class="cc-expand-body">
+                <div class="cc-field"><label>Организационно-правовая форма</label>
+                  <select id="cc-req-opf">
+                    <option value="">— не выбрано —</option>
+                    <option>ООО</option>
+                    <option>ИП</option>
+                    <option>АО</option>
+                    <option>ЗАО</option>
+                    <option>ПАО</option>
+                    <option>ГУП</option>
+                    <option>МУП</option>
+                    <option>Самозанятый</option>
+                  </select>
+                </div>
+                <div class="cc-field"><label>Полное наименование организации</label><input id="cc-req-fullname" type="text"></div>
+                <div class="cc-row cc-row-3">
+                  <div class="cc-field"><label>Фамилия</label><input id="cc-req-lastname" type="text"></div>
+                  <div class="cc-field"><label>Имя</label><input id="cc-req-firstname" type="text"></div>
+                  <div class="cc-field"><label>Отчество</label><input id="cc-req-patronymic" type="text"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>ИНН</label><input id="cc-req-inn" type="text"></div>
+                  <div class="cc-field"><label>ОГРН / ОГРНИП</label><input id="cc-req-ogrn" type="text"></div>
+                </div>
+                <div class="cc-row cc-row-2">
+                  <div class="cc-field"><label>ОКПО</label><input id="cc-req-okpo" type="text"></div>
+                  <div class="cc-field"><label>ОКВЭД</label><input id="cc-req-okved" type="text"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Секция 2: Контакты -->
+      <div class="cc-section open" id="sec-contacts">
+        <div class="cc-section-header" onclick="toggleSection('sec-contacts')">
+          <span class="cc-section-title">Контакты</span>
+          <svg class="cc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cc-section-body">
+          <div id="contacts-list"></div>
+          <button class="cc-add-link" onclick="addContact()" style="margin-top:4px;">+ Добавить дополнительный контакт</button>
+        </div>
+      </div>
+
+      <!-- Секция 3: Условия приёма -->
+      <div class="cc-section open" id="sec-delivery">
+        <div class="cc-section-header" onclick="toggleSection('sec-delivery')">
+          <span class="cc-section-title">Условия приёма</span>
+          <svg class="cc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cc-section-body">
+          <div class="cc-row cc-row-amt" style="margin-bottom:10px;">
+            <div class="cc-field"><label>Минимальная сумма заказа <span class="req">*</span></label><input id="cc-min-order" type="number" min="0" step="0.01" placeholder="0"></div>
+            <div class="cc-field"><label>Валюта <span class="req">*</span></label>
+              <select id="cc-min-order-cur"><option value="RUB">₽ рублей</option><option value="USD">$ долларов</option><option value="EUR">€ евро</option></select>
+            </div>
+          </div>
+          <div class="cc-row cc-row-amt" style="margin-bottom:16px;">
+            <div class="cc-field"><label>Стоимость доставки</label><input id="cc-delivery-cost" type="number" min="0" step="0.01" placeholder="0"></div>
+            <div class="cc-field"><label>Валюта <span class="req">*</span></label>
+              <select id="cc-delivery-cost-cur"><option value="RUB">₽ рублей</option><option value="USD">$ долларов</option><option value="EUR">€ евро</option></select>
+            </div>
+          </div>
+
+          <div style="font-size:13px;font-weight:600;color:#344054;margin-bottom:8px;">График приёма и поставки заказа</div>
+          <table class="cc-schedule" id="scheduleTable">
+            <thead>
+              <tr>
+                <th>Заказ поступает в</th>
+                <th>С</th>
+                <th>До</th>
+                <th>Тогда дата поставки</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /modal-body -->
+    <div class="cc-modal-footer">
+      <button class="btn btn-ghost" onclick="closeCardModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="saveCard()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Map picker modal -->
+<div class="map-modal" id="mapModal">
+  <div class="map-wrap">
+    <div class="map-head">
+      <h3>Выбрать адрес на карте</h3>
+      <input class="map-search-input" id="mapSearchInput" type="text" placeholder="Введите адрес для поиска…" oninput="mapSearchDebounce()" onkeydown="if(event.key==='Enter')mapSearch()">
+      <button class="btn btn-ghost" style="padding:6px 12px;" onclick="closeMapPicker()">✕</button>
+    </div>
+    <div class="map-results" id="mapResults"></div>
+    <div id="mapContainer"></div>
+    <div class="map-foot">
+      <span class="map-foot-addr" id="mapFootAddr">Кликните на карте или воспользуйтесь поиском</span>
+      <button class="btn btn-primary" onclick="applyMapAddr()">Применить</button>
+      <button class="btn btn-ghost" onclick="closeMapPicker()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+{% if supplier %}
+<script>
+const SUPPLIER_ID = '{{ supplier.pk }}';
+const INIT_DATA = {
+  display_name: '{{ supplier.display_name|escapejs }}',
+  legal_name: '{{ supplier.legal_name|default:""|escapejs }}',
+  inn: '{{ supplier.inn|default:""|escapejs }}',
+  phone: '{{ supplier.phone|default:""|escapejs }}',
+  email: '{{ supplier.email|default:""|escapejs }}',
+  delivery_terms: '{{ supplier.delivery_terms|default:""|escapejs }}',
+  min_order_amount: '{{ supplier.delivery_min_order_amount|default:""|escapejs }}',
+  min_order_currency: '{{ supplier.delivery_currency|default:"RUB"|escapejs }}',
+};
+const INIT_META = {{ supplier_metadata_json|safe }};
+
+const DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+const MESSENGERS = ['WhatsApp','Telegram','Viber','MAX','Другое'];
+
+function getCsrfToken() {
+  return document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrftoken='))?.split('=')[1]||'';
+}
+
+function toggleUploadError(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+// ── Section collapse ────────────────────────────────────────────────────────
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── Expandable blocks (address / requisites) ────────────────────────────────
+function toggleExpand(key) {
+  const body = document.getElementById(key + '-body');
+  const btn = body.previousElementSibling.querySelector('.cc-expand-btn');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? 'Раскрыть' : 'Свернуть';
+}
+
+// ── Contacts ────────────────────────────────────────────────────────────────
+let contacts = [];
+
+function addContact(data) {
+  const c = data || { first_name:'', last_name:'', patronymic:'', emails:[''], phones:[''], messengers:[{type:'',value:''}] };
+  contacts.push(c);
+  renderContacts();
+}
+
+function removeContact(idx) {
+  if (contacts.length <= 1) return;
+  contacts.splice(idx, 1);
+  renderContacts();
+}
+
+function renderContacts() {
+  const list = document.getElementById('contacts-list');
+  list.innerHTML = contacts.map((c, ci) => `
+    <div class="cc-contact-block">
+      ${contacts.length > 1 ? `<button class="btn-danger-text" style="position:absolute;top:10px;right:12px;font-size:12px;" onclick="removeContact(${ci})">Удалить</button>` : ''}
+      <div class="cc-contact-title">${ci === 0 ? 'Основной контакт' : `Контакт ${ci+1}`}</div>
+      <div class="cc-row cc-row-3" style="margin-bottom:8px;">
+        <div class="cc-field"><label>Имя <span class="req">*</span></label><input data-ci="${ci}" data-f="first_name" value="${esc(c.first_name)}" oninput="updateContact(this)"></div>
+        <div class="cc-field"><label>Фамилия <span class="req">*</span></label><input data-ci="${ci}" data-f="last_name" value="${esc(c.last_name)}" oninput="updateContact(this)"></div>
+        <div class="cc-field"><label>Отчество</label><input data-ci="${ci}" data-f="patronymic" value="${esc(c.patronymic)}" oninput="updateContact(this)"></div>
+      </div>
+      <div class="cc-field"><label>Электронная почта <span class="req">*</span></label>
+        <div id="emails-${ci}">
+          ${c.emails.map((e,ei)=>`<div class="cc-multi-row"><input type="email" value="${esc(e)}" oninput="updateMulti(${ci},'emails',${ei},this)"><button class="cc-remove-btn" onclick="removeMulti(${ci},'emails',${ei})">×</button></div>`).join('')}
+        </div>
+        <button class="cc-add-link" onclick="addMulti(${ci},'emails')">+ Добавить ещё почту</button>
+      </div>
+      <div class="cc-field"><label>Контактный телефон <span class="req">*</span></label>
+        <div id="phones-${ci}">
+          ${c.phones.map((p,pi)=>`<div class="cc-multi-row"><input type="tel" value="${esc(p)}" oninput="updateMulti(${ci},'phones',${pi},this)"><button class="cc-remove-btn" onclick="removeMulti(${ci},'phones',${pi})">×</button></div>`).join('')}
+        </div>
+        <button class="cc-add-link" onclick="addMulti(${ci},'phones')">+ Добавить ещё номер</button>
+      </div>
+      <div class="cc-field"><label>Мессенджер</label>
+        <div id="messengers-${ci}">
+          ${c.messengers.map((m,mi)=>`<div class="cc-multi-row">
+            <select onchange="updateMessengerType(${ci},${mi},this)">${MESSENGERS.map(ms=>`<option${ms===m.type?' selected':''}>${esc(ms)}</option>`).join('')}</select>
+            <input type="tel" value="${esc(m.value)}" oninput="updateMessengerVal(${ci},${mi},this)">
+            <button class="cc-remove-btn" onclick="removeMulti(${ci},'messengers',${mi})">×</button>
+          </div>`).join('')}
+        </div>
+        <button class="cc-add-link" onclick="addMulti(${ci},'messengers')">+ Добавить мессенджер</button>
+      </div>
+    </div>`).join('');
+}
+
+function updateContact(el) {
+  contacts[+el.dataset.ci][el.dataset.f] = el.value;
+}
+function updateMulti(ci, field, idx, el) {
+  contacts[ci][field][idx] = el.value;
+}
+function updateMessengerType(ci, mi, el) {
+  contacts[ci].messengers[mi].type = el.value;
+}
+function updateMessengerVal(ci, mi, el) {
+  contacts[ci].messengers[mi].value = el.value;
+}
+function addMulti(ci, field) {
+  if (field === 'messengers') contacts[ci].messengers.push({type:'',value:''});
+  else contacts[ci][field].push('');
+  renderContacts();
+}
+function removeMulti(ci, field, idx) {
+  if (contacts[ci][field].length <= 1) return;
+  contacts[ci][field].splice(idx, 1);
+  renderContacts();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Schedule ────────────────────────────────────────────────────────────────
+let schedule = [];
+
+function initSchedule(data) {
+  schedule = DAYS.map((day, i) => {
+    const saved = (data||[]).find(r => r.order_day === day);
+    return saved || { order_day: day, time_from: '00:00', time_to: '23:58', delivery_day: DAYS[(i+2)%7], enabled: false };
+  });
+}
+
+function renderSchedule() {
+  const tbody = document.getElementById('scheduleTbody');
+  tbody.innerHTML = schedule.map((row, i) => `
+    <tr class="${row.enabled ? '' : 'disabled'}" id="sched-row-${i}">
+      <td class="cc-schedule-day">${esc(row.order_day)}</td>
+      <td><input type="time" value="${esc(row.time_from)}" onchange="schedule[${i}].time_from=this.value"></td>
+      <td><input type="time" value="${esc(row.time_to)}" onchange="schedule[${i}].time_to=this.value"></td>
+      <td>
+        <select onchange="schedule[${i}].delivery_day=this.value">
+          ${DAYS.map(d=>`<option${d===row.delivery_day?' selected':''}>${esc(d)}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <label class="toggle">
+          <input type="checkbox" ${row.enabled?'checked':''} onchange="toggleScheduleRow(${i},this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+    </tr>`).join('');
+}
+
+function toggleScheduleRow(i, checked) {
+  schedule[i].enabled = checked;
+  document.getElementById('sched-row-' + i).className = checked ? '' : 'disabled';
+}
+
+// ── Modal open / close ──────────────────────────────────────────────────────
+function openCardModal() {
+  const meta = INIT_META;
+  // Основная информация
+  document.getElementById('cc-display-name').value = INIT_DATA.display_name || '';
+  document.getElementById('cc-legal-name').value = INIT_DATA.legal_name || '';
+  document.getElementById('cc-inn').value = INIT_DATA.inn;
+  // Адрес
+  const addr = meta.address || {};
+  setAddrFields('cc-addr', addr);
+  updateAddrBrief('addr', addr);
+  // Юридический адрес — чекбокс
+  const legalSame = meta.legal_same_as_addr !== false; // по умолчанию совпадает
+  const legalSameCb = document.getElementById('cc-legal-same');
+  legalSameCb.checked = legalSame;
+  document.getElementById('cc-legal-addr-wrap').style.display = legalSame ? 'none' : 'block';
+  if (!legalSame) {
+    const laddr = meta.legal_address || {};
+    setAddrFields('cc-laddr', laddr);
+    updateAddrBrief('legal-addr', laddr);
+  }
+  // Реквизиты
+  const req = meta.requisites || {};
+  document.getElementById('cc-req-opf').value = req.opf || '';
+  document.getElementById('cc-req-fullname').value = req.full_name || '';
+  document.getElementById('cc-req-lastname').value = req.last_name || '';
+  document.getElementById('cc-req-firstname').value = req.first_name || '';
+  document.getElementById('cc-req-patronymic').value = req.patronymic || '';
+  document.getElementById('cc-req-inn').value = req.inn || INIT_DATA.inn;
+  document.getElementById('cc-req-ogrn').value = req.ogrn || '';
+  document.getElementById('cc-req-okpo').value = req.okpo || '';
+  document.getElementById('cc-req-okved').value = req.okved || '';
+  updateReqBrief(req);
+  // Контакты
+  const savedContacts = meta.contacts && meta.contacts.length ? meta.contacts : [{
+    first_name: '', last_name: '', patronymic: '',
+    emails: [INIT_DATA.email || ''], phones: [INIT_DATA.phone || ''],
+    messengers: [{type: '', value: ''}]
+  }];
+  contacts = JSON.parse(JSON.stringify(savedContacts));
+  renderContacts();
+  // Условия
+  document.getElementById('cc-min-order').value = INIT_DATA.min_order_amount || meta.min_order_amount || '';
+  document.getElementById('cc-min-order-cur').value = INIT_DATA.min_order_currency || meta.min_order_currency || 'RUB';
+  document.getElementById('cc-delivery-cost').value = meta.delivery_cost || '';
+  document.getElementById('cc-delivery-cost-cur').value = meta.delivery_cost_currency || 'RUB';
+  // График
+  initSchedule(meta.schedule);
+  renderSchedule();
+
+  document.getElementById('cardModal').classList.add('show');
+}
+
+function closeCardModal() {
+  document.getElementById('cardModal').classList.remove('show');
+}
+
+function setAddrFields(prefix, addr) {
+  document.getElementById(prefix + '-index').value = addr.postal_index || '';
+  document.getElementById(prefix + '-country').value = addr.country || 'Россия';
+  document.getElementById(prefix + '-region').value = addr.region || '';
+  document.getElementById(prefix + '-district').value = addr.district || '';
+  document.getElementById(prefix + '-city').value = addr.city || '';
+  document.getElementById(prefix + '-street').value = addr.street || '';
+  document.getElementById(prefix + '-apt').value = addr.apartment || '';
+  if (document.getElementById(prefix + '-type'))
+    document.getElementById(prefix + '-type').value = addr.type || 'Юридический адрес';
+}
+
+function getAddrFields(prefix) {
+  return {
+    postal_index: document.getElementById(prefix + '-index').value.trim(),
+    country: document.getElementById(prefix + '-country').value.trim(),
+    region: document.getElementById(prefix + '-region').value.trim(),
+    district: document.getElementById(prefix + '-district').value.trim(),
+    city: document.getElementById(prefix + '-city').value.trim(),
+    street: document.getElementById(prefix + '-street').value.trim(),
+    apartment: document.getElementById(prefix + '-apt').value.trim(),
+    type: document.getElementById(prefix + '-type') ? document.getElementById(prefix + '-type').value : 'Юридический адрес',
+  };
+}
+
+function updateAddrBrief(key, addr) {
+  const parts = [addr.city, addr.street, addr.apartment].filter(Boolean);
+  document.getElementById(key + '-brief').textContent = parts.join(', ') || '—';
+}
+
+function updateReqBrief(req) {
+  const parts = [req.opf, req.full_name || req.last_name].filter(Boolean);
+  document.getElementById('req-brief').textContent = parts.join(', ') || '—';
+}
+
+// ── Save ────────────────────────────────────────────────────────────────────
+async function saveCard() {
+  const addr = getAddrFields('cc-addr');
+  const legalSame = document.getElementById('cc-legal-same').checked;
+  const laddr = legalSame ? null : getAddrFields('cc-laddr');
+  const req = {
+    opf: document.getElementById('cc-req-opf').value,
+    full_name: document.getElementById('cc-req-fullname').value.trim(),
+    last_name: document.getElementById('cc-req-lastname').value.trim(),
+    first_name: document.getElementById('cc-req-firstname').value.trim(),
+    patronymic: document.getElementById('cc-req-patronymic').value.trim(),
+    inn: document.getElementById('cc-req-inn').value.trim(),
+    ogrn: document.getElementById('cc-req-ogrn').value.trim(),
+    okpo: document.getElementById('cc-req-okpo').value.trim(),
+    okved: document.getElementById('cc-req-okved').value.trim(),
+  };
+  const mainContact = contacts[0] || {};
+  const body = {
+    display_name: document.getElementById('cc-display-name').value.trim() || undefined,
+    legal_name: document.getElementById('cc-legal-name').value.trim() || undefined,
+    inn: document.getElementById('cc-inn').value.trim(),
+    phone: (mainContact.phones || [])[0] || '',
+    email: (mainContact.emails || [])[0] || '',
+    min_order_amount: document.getElementById('cc-min-order').value || null,
+    min_order_currency: document.getElementById('cc-min-order-cur').value || 'RUB',
+    metadata: {
+      address: addr,
+      legal_same_as_addr: document.getElementById('cc-legal-same').checked,
+      legal_address: document.getElementById('cc-legal-same').checked ? null : laddr,
+      requisites: req,
+      contacts: contacts,
+      delivery_cost: document.getElementById('cc-delivery-cost').value,
+      delivery_cost_currency: document.getElementById('cc-delivery-cost-cur').value,
+      schedule: schedule,
+    },
+  };
+
+  try {
+    const resp = await fetch('/cabinet/supplier/' + SUPPLIER_ID + '/update/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    // Обновляем INIT_DATA и INIT_META локально
+    Object.assign(INIT_DATA, { display_name: data.display_name || INIT_DATA.display_name, legal_name: data.legal_name || INIT_DATA.legal_name, inn: data.inn, phone: data.phone, email: data.email, min_order_amount: data.min_order_amount, min_order_currency: data.min_order_currency });
+    Object.assign(INIT_META, data.metadata || body.metadata);
+    renderCardView();
+    closeCardModal();
+    showToast('Сохранено', 'success');
+  } catch {
+    showToast('Ошибка сохранения', 'error');
+  }
+}
+
+// ── Legal same checkbox ─────────────────────────────────────────────────────
+function toggleLegalSame(cb) {
+  const wrap = document.getElementById('cc-legal-addr-wrap');
+  wrap.style.display = cb.checked ? 'none' : 'block';
+  if (!cb.checked) {
+    // Раскрыть автоматически, чтобы пользователь сразу видел поля
+    document.getElementById('legal-addr-body').style.display = 'block';
+    document.querySelector('[onclick="toggleExpand(\'legal-addr\')"]').textContent = 'Свернуть';
+  }
+}
+
+// ── Map picker (Яндекс Карты 2.1 — ymaps.geocode) ──────────────────────────
+const YMAPS_ENABLED = {{ yandex_maps_key|yesno:"true,false" }};
+let _ymap = null;
+let _ymapMarker = null;
+let _ymapGeoObj = null;   // ymaps GeoObject после геокодирования
+let _mapTarget = 'addr';
+let _mapSearchTimer = null;
+
+function openMapPicker(target) {
+  if (!YMAPS_ENABLED) return;
+  _mapTarget = target;
+  _ymapGeoObj = null;
+  document.getElementById('mapModal').classList.add('show');
+  document.getElementById('mapFootAddr').textContent = 'Кликните на карте или воспользуйтесь поиском';
+  document.getElementById('mapSearchInput').value = '';
+  document.getElementById('mapResults').style.display = 'none';
+
+  ymaps.ready(function() {
+    if (!_ymap) {
+      _ymap = new ymaps.Map('mapContainer', {
+        center: [55.75, 37.62], zoom: 6,
+        controls: ['zoomControl', 'fullscreenControl']
+      });
+      _ymap.events.add('click', ymapOnClick);
+    } else {
+      _ymap.container.fitToViewport();
+    }
+  });
+}
+
+function closeMapPicker() {
+  document.getElementById('mapModal').classList.remove('show');
+}
+
+function ymapOnClick(e) {
+  const coords = e.get('coords');
+  _setMarker(coords);
+  document.getElementById('mapFootAddr').textContent = 'Загрузка…';
+
+  ymaps.geocode(coords, { results: 1 })
+    .then(function(res) {
+      if (!res.geoObjects.getLength()) {
+        document.getElementById('mapFootAddr').textContent = 'Адрес не определён';
+        return;
+      }
+      _ymapGeoObj = res.geoObjects.get(0);
+      document.getElementById('mapFootAddr').textContent = _getAddrText(_ymapGeoObj);
+    })
+    .catch(function() {
+      document.getElementById('mapFootAddr').textContent = 'Ошибка геокодирования';
+    });
+}
+
+function _setMarker(coords) {
+  if (_ymapMarker) {
+    _ymapMarker.geometry.setCoordinates(coords);
+  } else {
+    _ymapMarker = new ymaps.Placemark(coords, {}, { preset: 'islands#redDotIcon', draggable: true });
+    _ymapMarker.events.add('dragend', function() {
+      ymapOnClick({ get: function(k) { return k === 'coords' ? _ymapMarker.geometry.getCoordinates() : null; } });
+    });
+    _ymap.geoObjects.add(_ymapMarker);
+  }
+}
+
+function _getAddrText(obj) {
+  return obj.properties.get('text')
+      || obj.properties.get('name')
+      || obj.getAddressLine && obj.getAddressLine()
+      || '';
+}
+
+function mapSearchDebounce() {
+  clearTimeout(_mapSearchTimer);
+  _mapSearchTimer = setTimeout(mapSearch, 450);
+}
+
+function mapSearch() {
+  const q = document.getElementById('mapSearchInput').value.trim();
+  const box = document.getElementById('mapResults');
+  if (q.length < 2) { box.style.display = 'none'; return; }
+
+  ymaps.suggest(q, { results: 6 })
+    .then(function(items) {
+      if (!items.length) {
+        box.innerHTML = '<div class="map-result-item" style="color:#667085;">Ничего не найдено</div>';
+        box.style.display = 'block';
+        return;
+      }
+      box._suggests = items;
+      box.innerHTML = items.map((it, i) =>
+        `<div class="map-result-item" onclick="mapPickResult(${i})">${esc(it.displayName || it.value)}</div>`
+      ).join('');
+      box.style.display = 'block';
+    })
+    .catch(function() {});
+}
+
+function mapPickResult(idx) {
+  const box = document.getElementById('mapResults');
+  const item = (box._suggests || [])[idx];
+  box.style.display = 'none';
+  if (!item) return;
+  document.getElementById('mapSearchInput').value = item.value;
+
+  ymaps.geocode(item.value, { results: 1 })
+    .then(function(res) {
+      if (!res.geoObjects.getLength()) return;
+      const obj = res.geoObjects.get(0);
+      const coords = obj.geometry.getCoordinates();
+      _ymap.setCenter(coords, 16, { duration: 300 });
+      _setMarker(coords);
+      _ymapGeoObj = obj;
+      document.getElementById('mapFootAddr').textContent = _getAddrText(obj);
+    });
+}
+
+function applyMapAddr() {
+  if (!_ymapGeoObj) { closeMapPicker(); return; }
+  const prefix = _mapTarget === 'addr' ? 'cc-addr' : 'cc-laddr';
+
+  const components = _ymapGeoObj.properties.get('metaDataProperty.GeocoderMetaData.Address.Components') || [];
+  const postalCode = _ymapGeoObj.properties.get('metaDataProperty.GeocoderMetaData.Address.postal_code') || '';
+  const get = kind => (components.find(c => c.kind === kind) || {}).name || '';
+
+  const city = get('locality') || get('area');
+  const street = [get('street'), get('house')].filter(Boolean).join(', ');
+
+  document.getElementById(prefix + '-index').value = postalCode;
+  document.getElementById(prefix + '-country').value = get('country') || 'Россия';
+  document.getElementById(prefix + '-region').value = get('province');
+  document.getElementById(prefix + '-district').value = get('area');
+  document.getElementById(prefix + '-city').value = city;
+  document.getElementById(prefix + '-street').value = street;
+
+  const addrKey = _mapTarget === 'addr' ? 'addr' : 'legal-addr';
+  updateAddrBrief(addrKey, { city, street, apartment: '' });
+  const bodyId = _mapTarget === 'addr' ? 'addr-body' : 'legal-addr-body';
+  if (document.getElementById(bodyId).style.display === 'none')
+    toggleExpand(_mapTarget === 'addr' ? 'addr' : 'legal-addr');
+  closeMapPicker();
+}
+
+// ── View mode render ────────────────────────────────────────────────────────
+function renderCardView() {
+  const meta = INIT_META;
+  const addr = meta.address || {};
+  const req = meta.requisites || {};
+  const contact = (meta.contacts || [])[0] || {};
+  const addrStr = [addr.city, addr.street, addr.apartment].filter(Boolean).join(', ') || '—';
+  const schedule = (meta.schedule || []).filter(r => r.enabled);
+
+  const rows = [
+    ['Торговое название', INIT_DATA.display_name || '—'],
+    ...(INIT_DATA.legal_name ? [['Юридическое название', INIT_DATA.legal_name]] : []),
+    ['ИНН', INIT_DATA.inn || '—'],
+    ['ОПФ', req.opf || '—'],
+    ['ОГРН / ОГРНИП', req.ogrn || '—'],
+    ['ОКВЭД', req.okved || '—'],
+    ['Адрес', addrStr],
+    ['Телефон', INIT_DATA.phone || '—'],
+    ['Email', INIT_DATA.email || '—'],
+    ['Мин. заказ', INIT_DATA.min_order_amount ? INIT_DATA.min_order_amount + ' ' + currencyLabel(INIT_DATA.min_order_currency || meta.min_order_currency) : '—'],
+    ['Доставка', meta.delivery_cost ? meta.delivery_cost + ' ' + currencyLabel(meta.delivery_cost_currency) : '—'],
+    ['Рабочих дней', schedule.length ? schedule.map(r=>r.order_day.slice(0,2)).join(', ') : '—'],
+  ];
+  document.getElementById('infoGrid').innerHTML = rows.map(([label, value]) =>
+    `<div class="info-item"><div class="info-label">${label}</div><div class="info-value">${esc(String(value))}</div></div>`
+  ).join('');
+}
+
+function currencyLabel(code) {
+  return code === 'USD' ? '$' : code === 'EUR' ? '€' : '₽';
+}
+
+// Закрытие по Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeMapPicker(); closeCardModal(); }
+});
+
+// Инициализация
+renderCardView();
+
+// ── File upload ──────────────────────────────────────────────────────────────
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('uploadZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+}
+
+function _setUploadZoneState(state, text, sub) {
+  const zone = document.getElementById('uploadZone');
+  zone.className = 'upload-zone' + (state ? ' ' + state : '');
+  if (state === 'uploading' || state === 'done') zone.onclick = null;
+  else zone.onclick = () => document.getElementById('fileInput').click();
+  document.getElementById('uploadText').textContent = text;
+  document.getElementById('uploadSub').textContent = sub;
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  const zone = document.getElementById('uploadZone');
+  const progress = document.getElementById('uploadProgress');
+  const fill = document.getElementById('uploadFill');
+  const label = document.getElementById('uploadLabel');
+
+  _setUploadZoneState('uploading', file.name, 'Загрузка файла...');
+  document.getElementById('uploadIcon').textContent = '⏳';
+  progress.style.display = 'block';
+  fill.style.width = '30%';
+  label.textContent = 'Отправка на сервер...';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('csrfmiddlewaretoken', getCsrfToken());
+
+  let uploadId;
+  try {
+    const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/uploads/file/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: formData,
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      _setUploadZoneState('', 'Нажмите или перетащите файл прайса', 'Форматы: XLSX, CSV, PDF, DOCX, TXT');
+      document.getElementById('uploadIcon').textContent = '📄';
+      progress.style.display = 'none';
+      showToast(data.detail || 'Ошибка загрузки', 'error');
+      return;
+    }
+    uploadId = data.upload_id;
+  } catch {
+    _setUploadZoneState('', 'Нажмите или перетащите файл прайса', 'Форматы: XLSX, CSV, PDF, DOCX, TXT');
+    document.getElementById('uploadIcon').textContent = '📄';
+    progress.style.display = 'none';
+    showToast('Ошибка соединения', 'error');
+    return;
+  }
+
+  fill.style.width = '60%';
+  label.textContent = 'Нормализация...';
+  addUploadRow(uploadId, file.name);
+  pollUploadStatus(uploadId, fill, label);
+}
+
+function addUploadRow(uploadId, fileName) {
+  const noMsg = document.getElementById('noUploadsMsg');
+  if (noMsg) noMsg.style.display = 'none';
+
+  let tbody = document.getElementById('uploadsTableBody');
+  if (!tbody) {
+    // таблица ещё не существует — создаём её
+    const card = noMsg ? noMsg.closest('.card') : null;
+    if (!card) return;
+    const table = document.createElement('table');
+    table.innerHTML = `<thead><tr><th>Файл</th><th>Дата</th><th>Статус</th><th>Позиций</th><th>Новых</th><th>Цен</th></tr></thead><tbody id="uploadsTableBody"></tbody>`;
+    card.appendChild(table);
+    tbody = document.getElementById('uploadsTableBody');
+  }
+
+  const tr = document.createElement('tr');
+  tr.id = 'urow-' + uploadId;
+  tr.innerHTML = `
+    <td>${esc(fileName)}</td>
+    <td>только что</td>
+    <td><span class="status status-received" id="ustatus-${uploadId}">Получен</span></td>
+    <td id="uitems-${uploadId}">—</td>
+    <td id="ucreated-${uploadId}">—</td>
+    <td id="uprices-${uploadId}">—</td>`;
+  tbody.prepend(tr);
+}
+
+const STATUS_LABELS = {
+  applied: 'Обработан', processing: 'Обработка...', failed: 'Ошибка',
+  received: 'Получен', needs_review: 'На проверке',
+};
+const STATUS_CLASSES = {
+  applied: 'status-applied', processing: 'status-processing', failed: 'status-failed',
+  received: 'status-received', needs_review: 'status-processing',
+};
+const TERMINAL = new Set(['applied', 'failed', 'needs_review']);
+
+async function pollUploadStatus(uploadId, fill, label) {
+  let attempts = 0;
+  const maxAttempts = 60; // 5 min max
+  while (attempts < maxAttempts) {
+    await new Promise(r => setTimeout(r, 5000));
+    attempts++;
+    try {
+      const resp = await fetch('/supplier/' + SUPPLIER_ID + '/api/uploads/' + uploadId + '/status/', {
+        headers: { 'X-CSRFToken': getCsrfToken() },
+      });
+      if (!resp.ok) break;
+      const data = await resp.json();
+
+      const statusEl = document.getElementById('ustatus-' + uploadId);
+      if (statusEl) {
+        statusEl.textContent = STATUS_LABELS[data.status] || data.status;
+        statusEl.className = 'status ' + (STATUS_CLASSES[data.status] || '');
+      }
+      const setCell = (id, val) => { const el = document.getElementById(id + uploadId); if (el) el.textContent = val; };
+      setCell('uitems-', data.items_total || 0);
+      setCell('ucreated-', data.products_created || 0);
+      setCell('uprices-', data.prices_created || 0);
+
+      if (TERMINAL.has(data.status)) {
+        fill.style.width = '100%';
+        if (data.status === 'applied') {
+          label.textContent = `Готово: ${data.items_total} позиций`;
+          _setUploadZoneState('done', 'Файл обработан успешно', `${data.products_created} товаров, ${data.prices_created} цен`);
+          document.getElementById('uploadIcon').textContent = '✅';
+          showToast('Прайс обработан!', 'success');
+        } else if (data.status === 'needs_review') {
+          label.textContent = `На проверке: ${data.items_total} позиций`;
+          _setUploadZoneState('done', 'Требует проверки', `${data.items_total} позиций на проверке`);
+          document.getElementById('uploadIcon').textContent = '⚠️';
+          showToast('Прайс загружен, часть позиций требует проверки', 'success');
+        } else {
+          label.textContent = 'Ошибка обработки';
+          _setUploadZoneState('', 'Нажмите или перетащите файл прайса', data.error_message || 'Ошибка');
+          document.getElementById('uploadIcon').textContent = '❌';
+          showToast('Ошибка обработки файла', 'error');
+        }
+        setTimeout(() => {
+          document.getElementById('uploadProgress').style.display = 'none';
+          if (data.status === 'applied' || data.status === 'needs_review') {
+            _setUploadZoneState('', 'Нажмите или перетащите файл прайса', 'Форматы: XLSX, CSV, PDF, DOCX, TXT');
+            document.getElementById('uploadIcon').textContent = '📄';
+            document.getElementById('fileInput').value = '';
+          }
+        }, 4000);
+        return;
+      }
+      fill.style.width = Math.min(60 + attempts * 2, 90) + '%';
+    } catch { break; }
+  }
+  // timeout
+  label.textContent = 'Проверьте статус позже';
+  _setUploadZoneState('', 'Нажмите или перетащите файл прайса', 'Форматы: XLSX, CSV, PDF, DOCX, TXT');
+  document.getElementById('uploadIcon').textContent = '📄';
+  document.getElementById('uploadProgress').style.display = 'none';
+}
+</script>
+{% endif %}
+</body>
+</html>

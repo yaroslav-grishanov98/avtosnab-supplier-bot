@@ -1,0 +1,274 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: autosnab_db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: autosnab_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    container_name: autosnab_migrate
+    env_file:
+      - .env
+    environment:
+      - ROLE=migrate
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: .
+    container_name: autosnab_web
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - ROLE=web
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0},web
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - media_data:/app/var/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build: .
+    container_name: autosnab_worker
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - ROLE=worker
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/var/media
+
+  notifications-worker:
+    build: .
+    container_name: autosnab_notifications_worker
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - ROLE=notifications-worker
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --timeout 5 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  iiko-worker:
+    build: .
+    restart: always
+    env_file: [.env]
+    environment:
+      ROLE: iiko-worker
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d iiko-sync@$$HOSTNAME --timeout 5 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  iiko-manual-worker:
+    build: .
+    restart: always
+    env_file: [.env]
+    environment:
+      ROLE: iiko-manual-worker
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d iiko-manual@$$HOSTNAME --timeout 5 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notifications-bot:
+    profiles: ["notifications"]
+    image: autosnab-notifications-bot:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bot
+    container_name: autosnab_notifications_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - BACKEND_BASE_URL=http://web:8000/api/v1
+    command: ["python", "notifications_main.py"]
+    depends_on:
+      web:
+        condition: service_healthy
+
+  max-notifications-bot:
+    profiles: ["notifications"]
+    image: autosnab-notifications-bot:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bot
+    container_name: autosnab_max_notifications_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - BACKEND_BASE_URL=http://web:8000/api/v1
+      - MAX_BOT_PORT=8090
+    command: ["python", "max_notifications_main.py"]
+    ports:
+      - "8090:8090"
+    depends_on:
+      web:
+        condition: service_healthy
+
+  beat:
+    build: .
+    container_name: autosnab_beat
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - ROLE=beat
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: autosnab_ngrok
+    restart: on-failure
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http web:8000 --log=stdout
+    ports:
+      - "4040:4040"
+    depends_on:
+      - web
+
+  ngrok-n8n:
+    image: ngrok/ngrok:latest
+    container_name: autosnab_ngrok_n8n
+    restart: on-failure
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http n8n:5678 --log=stdout
+    ports:
+      - "4141:4040"
+    depends_on:
+      - n8n
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: autosnab_n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_SECURE_COOKIE=false
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=Europe/Moscow
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  postgres_data:
+  media_data:
+  n8n_data:

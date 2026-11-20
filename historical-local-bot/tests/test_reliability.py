@@ -1,0 +1,67 @@
+import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+import main
+from api.ocr import google_ocr
+
+
+class TelegramReliabilityTests(unittest.IsolatedAsyncioTestCase):
+    def test_application_has_global_error_handler(self):
+        with patch.object(main, "TELEGRAM_BOT_TOKEN", "123456:TEST_TOKEN"):
+            app = main.build_application()
+        self.assertEqual(len(app.error_handlers), 1)
+
+    def test_application_rejects_missing_token(self):
+        with patch.object(main, "TELEGRAM_BOT_TOKEN", ""):
+            with self.assertRaisesRegex(RuntimeError, "TELEGRAM_BOT_TOKEN"):
+                main.build_application()
+
+    async def test_expired_callback_does_not_stop_dispatch(self):
+        answer = AsyncMock(side_effect=RuntimeError("query is too old"))
+        update = SimpleNamespace(callback_query=SimpleNamespace(answer=answer))
+        normalized = SimpleNamespace(chat_id="chat-1")
+        dispatch = AsyncMock()
+
+        with patch.object(main, "normalize", return_value=normalized), patch.object(main, "dispatch", new=dispatch):
+            await main.handle_update(update, SimpleNamespace())
+
+        answer.assert_awaited_once()
+        dispatch.assert_awaited_once_with(normalized)
+
+    async def test_unhandled_error_sends_safe_message(self):
+        send_message = AsyncMock()
+        update = SimpleNamespace(effective_chat=SimpleNamespace(id=123))
+        context = SimpleNamespace(
+            error=RuntimeError("internal secret detail"),
+            bot=SimpleNamespace(send_message=send_message),
+        )
+
+        await main.handle_error(update, context)
+
+        send_message.assert_awaited_once()
+        sent_text = send_message.await_args.kwargs["text"]
+        self.assertIn("/menu", sent_text)
+        self.assertNotIn("internal secret detail", sent_text)
+
+    async def test_error_without_chat_is_only_logged(self):
+        context = SimpleNamespace(error=RuntimeError("background failure"))
+        await main.handle_error(None, context)
+
+
+class OcrReliabilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ocr_does_not_return_internal_exception_to_user(self):
+        with (
+            patch.object(google_ocr, "GOOGLE_DRIVE_OCR_ENABLED", True),
+            patch.object(google_ocr.asyncio, "to_thread", new=AsyncMock(side_effect=RuntimeError("oauth secret"))),
+            patch.object(google_ocr, "langfuse_track", new=AsyncMock()),
+        ):
+            result = await google_ocr.recognize_document(b"not-an-image", "price.jpg")
+
+        self.assertFalse(result["success"])
+        self.assertIn("Не удалось распознать документ", result["error"])
+        self.assertNotIn("oauth secret", result["error"])
+
+
+if __name__ == "__main__":
+    unittest.main()

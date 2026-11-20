@@ -1,0 +1,4681 @@
+{
+  "name": "Прод | Бот для поставщиков | Входящие Telegram v3",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "id": "66c49a43-80f5-493d-8313-ffa6a3911118",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3632,
+        2848
+      ],
+      "webhookId": "b90de2f0-1f5e-4644-b2de-2ddcd69485dd",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const update = $json;\nconst callback = update.callback_query ?? null;\nconst msg = callback?.message ?? update.message ?? update;\nconst from = callback?.from ?? msg.from ?? {};\n\nconst chatId = String(msg.chat?.id ?? msg.chat_id ?? from.id ?? '');\nconst externalUserId = String(from.id ?? '');\nconst username = from.username ?? '';\nconst firstName = from.first_name ?? '';\nconst lastName = from.last_name ?? '';\nconst messageId = String(msg.message_id ?? msg.id ?? '');\nconst text = String(msg.text ?? msg.caption ?? '').trim();\nconst callbackData = String(callback?.data ?? '').trim();\n\nconst document = msg.document ?? null;\nconst photo = msg.photo ?? null;\nconst voice = msg.voice ?? null;\nconst audio = msg.audio ?? null;\nconst videoNote = msg.video_note ?? null;\nconst video = msg.video ?? null;\nconst sticker = msg.sticker ?? null;\nconst animation = msg.animation ?? null;\nconst contact = msg.contact ?? null;\nconst location = msg.location ?? null;\n\nlet fileId = document?.file_id ?? null;\nlet fileName = document?.file_name ?? null;\nlet mimeType = document?.mime_type ?? null;\n\nif (!fileId && Array.isArray(photo) && photo.length > 0) {\n  const bestPhoto = photo[photo.length - 1];\n  fileId = bestPhoto.file_id ?? null;\n  fileName = `photo_${messageId}.jpg`;\n  mimeType = 'image/jpeg';\n}\n\nconst SUPPORTED_MIME = new Set([\n  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n  'text/csv', 'application/csv', 'application/vnd.ms-excel',\n  'application/pdf',\n  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',\n  'application/msword',\n  'text/plain',\n  'image/jpeg', 'image/png',\n]);\n\nlet messageType = 'unknown';\nif (fileId && SUPPORTED_MIME.has(mimeType)) messageType = 'supported_file';\nelse if (fileId && document) messageType = 'unsupported_file';\nelse if (voice || audio) messageType = 'voice';\nelse if (sticker) messageType = 'sticker';\nelse if (animation) messageType = 'animation';\nelse if (videoNote || video) messageType = 'video';\nelse if (contact) messageType = 'contact';\nelse if (location) messageType = 'location';\nelse if (text) messageType = 'text';\n\nlet route = 'unknown';\nconst startMatch = /^\\/start\\s+(\\S+)/.exec(text);\nconst startPayload = startMatch ? startMatch[1] : '';\nif (startPayload) route = 'deep_link_register';\nelse if (callbackData === 'register_supplier' || callbackData === 'start_registration') route = 'callback_register_supplier';\nelse if (callbackData === 'cancel_registration') route = 'callback_cancel_registration';\nelse if (callbackData === 'process_pending_upload') route = 'callback_process_pending_upload';\nelse if (callbackData === 'upload_new_price' || callbackData === 'update_price_upload') route = 'callback_upload_new_price';\nelse if (callbackData === 'confirm_upload') route = 'callback_confirm_upload';\nelse if (callbackData === 'reject_upload') route = 'callback_reject_upload';\nelse if (callbackData === 'show_products') route = 'show_products';\nelse if (callbackData === 'contact_manager' || callbackData === 'help') route = 'contact_manager';\nelse if (callbackData === 'supplier_main_menu' || callbackData === 'main_menu') route = 'supplier_main_menu';\nelse if (callbackData === 'open_cabinet') route = 'open_cabinet';\nelse if (messageType === 'supported_file') route = 'file_upload';\nelse if (messageType === 'unsupported_file') route = 'unsupported_format';\nelse if (messageType === 'voice') route = 'voice_message';\nelse if (['sticker', 'animation', 'video', 'contact', 'location'].includes(messageType)) route = 'unsupported_message';\nelse if (/^(измени|обнови|поменяй|поставь)\\b/i.test(text) && /цен/i.test(text)) route = 'update_price_command';\nelse if (/^(покажи|список|товары|каталог|мои товары|мой прайс)\\b/i.test(text)) route = 'show_products';\nelse if (/^(меню|старт|start|menu|help|помощь|\\/?start|\\/?help|\\/?menu)$/i.test(text)) route = 'supplier_main_menu';\nelse if (/^(привет|здравствуй|добрый|доброе|добрый день|добрый вечер|доброе утро|хай|hi|hello|йо)\\b/i.test(text)) route = 'greeting';\nelse if (/^(спасибо|благодар|пасиб|thx|thanks|ок|ладно|понял|хорошо|отлично|супер|круто|класс|ура)\\b/i.test(text)) route = 'thanks';\nelse if (/\\?\\s*$/.test(text) || /^(как|что|где|когда|зачем|почему|можно|а можно|скажи|подскажи|расскажи)\\b/i.test(text)) route = 'question';\nelse if (/^(загрузи|отправ|прайс|файл|excel|эксель|xlsx|csv|pdf)\\b/i.test(text)) route = 'wants_upload';\n// text uploads disabled — all text goes through NLP or unknown_text\nelse if (text) route = 'unknown_text';\n\nreturn {\n  json: {\n    source_channel: 'telegram',\n    platform: 'telegram',\n    chat_id: chatId,\n    external_user_id: externalUserId,\n    telegram_user_id: externalUserId,\n    username,\n    first_name: firstName,\n    last_name: lastName,\n    message_id: messageId,\n    text,\n    callback_data: callbackData,\n    callback_query_id: callback?.id ?? '',\n    is_callback_query: Boolean(callback?.id),\n    has_file: Boolean(fileId),\n    file_id: fileId,\n    file_name: fileName,\n    mime_type: mimeType,\n    message_type: messageType,\n    route,\n    start_payload: startPayload,\n    n8n_execution_id: typeof $execution !== 'undefined' ? String($execution.id) : '',\n    received_at: new Date().toISOString(),\n  },\n};"
+      },
+      "id": "9796442b-5477-41ce-ba66-a5fad9388572",
+      "name": "Normalize Incoming Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3344,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-bindings/resolve",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.platform}}"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "5f37542e-834d-47b1-8ee4-76cb3aaeb674",
+      "name": "Resolve Supplier Binding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3040,
+        2848
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "file_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "8665d79e-842f-4cf7-a7d2-f19588addb79"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "file_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "text_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "84329f0c-eff6-47ce-b7fe-bd30f51dc190"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "update_price_command",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c530651d-bb56-4b8b-9665-47a127228d4e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "update_price_command"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "show_products",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "daad6da9-32bf-4e8d-85f9-c51138f9e9b6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "show_products"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_process_pending_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3c5b98c2-b0ac-4231-8429-ec2a4eb2c7b0"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "process_pending_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_upload_new_price",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f7328667-c2f4-4c42-b060-0a97dad85e9a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "upload_new_price"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "contact_manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "contact-manager-main-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "contact_manager"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "supplier_main_menu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "supplier-main-menu-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "supplier_main_menu"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_register_supplier",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "register-supplier-existing-binding-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "register_supplier_existing_binding"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_cancel_registration",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "cancel-registration-existing-binding-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_registration_existing_binding"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "voice_message",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "voice-message-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "voice_message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "unsupported_message",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "unsupported-message-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unsupported_message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_confirm_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "confirm-upload-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "callback_confirm_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_reject_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "reject-upload-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "callback_reject_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "greeting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "greeting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "thanks",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "thanks"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "question",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "question"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "wants_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "wants_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "unknown_text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unknown_text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "open_cabinet",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "open_cabinet"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "unsupported_format",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "499bf5c7-cb81-49b7-8383-63d17dcaa83d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unsupported_format"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a0ee638e-6006-4607-afc6-95e579af277d",
+      "name": "Route Message",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1840,
+        2352
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{$json.file_id || $('Normalize Incoming Telegram Message').first().json.file_id}}",
+        "download": true
+      },
+      "id": "9a8ffb47-da38-4d09-8391-104a02268be8",
+      "name": "Telegram Get File Path",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        1696
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "supplier_id",
+              "value": "={{ (() => { try { return $('Restore Pending Upload Context').first().json.supplier_id; } catch (e) {} try { return $('Normalize Registration Result').first().json.supplier_id; } catch (e) {} try { return $('Merge Binding And State').first().json.supplier_id; } catch (e) {} return $json.supplier_id; })() }}"
+            },
+            {
+              "name": "source_channel",
+              "value": "telegram"
+            },
+            {
+              "name": "source_file_name",
+              "value": "={{ (() => { try { return $('Restore Pending Upload Context').first().json.file_name || $('Normalize Incoming Telegram Message').first().json.file_name; } catch (e) { return $('Normalize Incoming Telegram Message').first().json.file_name; } })() }}"
+            },
+            {
+              "name": "telegram_message_id",
+              "value": "={{ (() => { try { return $('Restore Pending Upload Context').first().json.message_id || $('Normalize Incoming Telegram Message').first().json.message_id; } catch (e) { return $('Normalize Incoming Telegram Message').first().json.message_id; } })() }}"
+            },
+            {
+              "name": "n8n_execution_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.n8n_execution_id}}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "source_file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "8eb7db31-1a2b-4d61-905c-4191273475c9",
+      "name": "Create Upload - File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        1600
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8817284c-bf1a-4a6e-b620-8a0ca4a89333",
+      "name": "Read Spreadsheet Rows",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        304,
+        3168
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "fa4546d1-cbd7-40b0-89b1-19caf1a6d386",
+      "name": "Wait File Upload And Rows",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        624,
+        3072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let resolved = {};\ntry { resolved = $('Restore Pending Upload Context').first().json; } catch (error) {}\nif (!resolved?.supplier_id) {\n  try {\n    const registered = $('Register Supplier Binding').first().json;\n    resolved = {\n      ...resolved,\n      ...registered,\n      supplier_id: registered[\"binding\"]?.[\"supplier_id\"],\n      supplier_name: registered[\"binding\"]?.[\"supplier_name\"],\n    };\n  } catch (error) {}\n}\nif (!resolved?.supplier_id) {\n  const bound = $('Resolve Supplier Binding').first().json;\n  resolved = {\n    ...resolved,\n    ...bound,\n    supplier_id: bound[\"binding\"]?.[\"supplier_id\"],\n    supplier_name: bound[\"binding\"]?.[\"supplier_name\"],\n  };\n}\nconst context = {\n  ...resolved,\n  supplier_id: resolved.supplier_id ?? resolved[\"binding\"]?.[\"supplier_id\"],\n  supplier_name: resolved.supplier_name ?? resolved[\"binding\"]?.[\"supplier_name\"],\n  pending_action_id: resolved.pending_action_id ?? resolved.pending_action?.id ?? null,\n};\nconst incoming = $('Normalize Incoming Telegram Message').first().json;\nconst upload = $('Create Upload - File').first().json;\n\nconst CHUNK_SIZE = 10;\nconst MAX_CELL_LENGTH = 240;\nconst MAX_COLUMNS = 14;\nconst SYSTEM_KEYS = new Set([\n  'id', 'status', 'supplier_id', 'source_channel', 'source_file_name',\n  'raw_payload', 'ai_payload', 'processed_at', 'created_at', 'updated_at',\n]);\n\nfunction cleanValue(value, maxLength = MAX_CELL_LENGTH) {\n  if (value === null || value === undefined) return '';\n  if (typeof value === 'object') return JSON.stringify(value).replace(/\\s+/g, ' ').trim().slice(0, maxLength);\n  return String(value).replace(/\\s+/g, ' ').trim().slice(0, maxLength);\n}\n\nfunction looksLikeUploadResponse(json) {\n  if (!json || typeof json !== 'object') return false;\n  if (upload?.id && json.id === upload.id) return true;\n  const keys = Object.keys(json);\n  const systemKeyCount = keys.filter((key) => SYSTEM_KEYS.has(key)).length;\n  return Boolean(json.id && json.status && json.source_channel && systemKeyCount >= 3);\n}\n\nfunction getSpreadsheetItems() {\n  try {\n    const rows = $('Read Spreadsheet Rows').all();\n    if (Array.isArray(rows) && rows.length > 0) return rows;\n  } catch (error) {}\n  return $input.all().filter((item) => !looksLikeUploadResponse(item.json));\n}\n\nconst spreadsheetItems = getSpreadsheetItems();\nconst rows = [];\nfor (const item of spreadsheetItems) {\n  const source = item.json ?? {};\n  if (looksLikeUploadResponse(source)) continue;\n\n  const clean = {};\n  for (const [key, value] of Object.entries(source)) {\n    if (key === '__rowNum__' || key === 'row_number' || key === 'rowNumber') continue;\n    const normalizedKey = cleanValue(key, 80);\n    const text = cleanValue(value);\n    if (!normalizedKey || !text) continue;\n    if (Object.keys(clean).length >= MAX_COLUMNS) break;\n    clean[normalizedKey] = text;\n  }\n  if (Object.keys(clean).length === 0) continue;\n\n  const sourceRowNumber = Number(source.__rowNum__ ?? source.row_number ?? source.rowNumber);\n  rows.push({\n    row_number: Number.isFinite(sourceRowNumber) && sourceRowNumber > 0 ? sourceRowNumber : rows.length + 1,\n    cells: clean,\n  });\n}\n\nif (rows.length === 0) {\n  return [{\n    json: {\n      ...context,\n      ...incoming,\n      upload_id: upload.id,\n      upload_status: upload.status,\n      source_file_name: upload.source_file_name,\n      chunk_index: 1,\n      chunk_total: 1,\n      chunk_start_row: null,\n      chunk_end_row: null,\n      rows: [],\n      ai_input_text: 'Прайс не содержит распознанных строк.',\n    },\n  }];\n}\n\nconst chunks = [];\nfor (let start = 0; start < rows.length; start += CHUNK_SIZE) {\n  chunks.push(rows.slice(start, start + CHUNK_SIZE));\n}\n\nreturn chunks.map((chunkRows, index) => {\n  const aiInputText = chunkRows.map((row) => {\n    const cells = Object.entries(row.cells)\n      .map(([key, value]) => `${key}: ${value}`)\n      .join('; ');\n    return `row_number=${row.row_number}; ${cells}`;\n  }).join('\\n');\n\n  return {\n    json: {\n      ...context,\n      ...incoming,\n      upload_id: upload.id,\n      upload_status: upload.status,\n      source_file_name: upload.source_file_name,\n      chunk_index: index + 1,\n      chunk_total: chunks.length,\n      chunk_start_row: chunkRows[0]?.row_number ?? null,\n      chunk_end_row: chunkRows[chunkRows.length - 1]?.row_number ?? null,\n      rows: chunkRows,\n      ai_input_text: aiInputText,\n    },\n  };\n});"
+      },
+      "id": "0b2f5972-73d9-4d9b-858f-268bdce760ef",
+      "name": "Prepare AI Input From Spreadsheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        3072
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rows = Array.isArray($json.rows) ? $json.rows : [];\nif (rows.length > 30) {\n  throw new Error(`Chunk overflow: rows.length=${rows.length}, chunk_index=${$json.chunk_index ?? 'unknown'}`);\n}\nreturn { json: { ...$json } };"
+      },
+      "id": "474224cd-c1ae-49c0-ae40-3202d85f8f15",
+      "name": "Validate AI Chunk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        3648
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "id": "5d4b8fed-3330-43e7-88f9-1cc36ea14445",
+      "name": "Wait 3 seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1664,
+        3648
+      ],
+      "webhookId": "2f839153-a6e1-4c9f-b5f0-578d6b39d5e2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "0a4f5894-0bef-463d-919e-81cc491d0208",
+      "name": "Loop Over AI Chunks",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1216,
+        3424
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "supplier_id",
+              "value": "={{$json.supplier_id}}"
+            },
+            {
+              "name": "source_channel",
+              "value": "telegram"
+            },
+            {
+              "name": "text",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.text}}"
+            },
+            {
+              "name": "source_file_name",
+              "value": "=telegram-message-{{$('Normalize Incoming Telegram Message').first().json.message_id}}"
+            },
+            {
+              "name": "telegram_message_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.message_id}}"
+            },
+            {
+              "name": "n8n_execution_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.n8n_execution_id}}"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ff41d139-d48a-4556-b1f2-b05685084d53",
+      "name": "Create Upload - Text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1536,
+        2240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let context = {};\ntry { context = $('Merge Binding And State').first().json; } catch (error) {}\nif (!context?.supplier_id) {\n  try {\n    const registered = $('Register Supplier Binding').first().json;\n    context = {\n      ...context,\n      ...registered,\n      supplier_id: registered[\"binding\"]?.[\"supplier_id\"] ?? null,\n      supplier_name: registered[\"binding\"]?.[\"supplier_name\"] ?? null,\n    };\n  } catch (error) {}\n}\nconst incoming = $('Normalize Incoming Telegram Message').first().json;\nconst upload = $('Create Upload - Text').first().json;\n\nconst CHUNK_SIZE = 30;\nconst MAX_LINE_LENGTH = 600;\nfunction cleanLine(value) {\n  return String(value ?? '').replace(/\\s+/g, ' ').trim().slice(0, MAX_LINE_LENGTH);\n}\n\nconst lines = String(incoming.text ?? '')\n  .split(/\\r?\\n/)\n  .map(cleanLine)\n  .filter(Boolean);\n\nconst rows = lines.length > 0\n  ? lines.map((line, index) => ({ row_number: index + 1, cells: { text: line } }))\n  : [{ row_number: 1, cells: { text: cleanLine(incoming.text) } }];\n\nconst chunks = [];\nfor (let start = 0; start < rows.length; start += CHUNK_SIZE) {\n  chunks.push(rows.slice(start, start + CHUNK_SIZE));\n}\n\nreturn chunks.map((chunkRows, index) => ({\n  json: {\n    ...context,\n    ...incoming,\n    upload_id: upload.id,\n    upload_status: upload.status,\n    chunk_index: index + 1,\n    chunk_total: chunks.length,\n    chunk_start_row: chunkRows[0]?.row_number ?? null,\n    chunk_end_row: chunkRows[chunkRows.length - 1]?.row_number ?? null,\n    ai_input_text: chunkRows.map((row) => `row_number=${row.row_number}; text: ${row.cells.text}`).join('\\n'),\n    rows: chunkRows,\n  },\n}));"
+      },
+      "id": "9c2e2abb-54ae-44a9-b439-2059e83e7d16",
+      "name": "Prepare AI Input From Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        3616
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.artemox.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <AI_API_KEY>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify({\n  model: 'gpt-4o-mini',\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [\n    {\n      role: 'system',\n      content: 'Ты нормализатор прайсов HoReCa для AutoSnab. Верни только JSON без markdown. Схема: {\"schema_version\":\"supplier_price_ai.v1\",\"processing_version\":\"n8n-demo-2026-06-18\",\"supplier_name\":\"...\",\"products\":[{\"row_number\":1,\"raw_name\":\"...\",\"normalized_name\":\"...\",\"supplier_sku\":\"...\",\"price\":\"185.50\",\"currency\":\"RUB\",\"unit_code\":\"шт\",\"package_info\":\"400 мл ж/б\",\"brand\":\"Aroy-D\",\"volume\":\"400\",\"volume_unit\":\"мл\",\"min_order_qty\":\"1\",\"multiplicity\":\"1\",\"category_path\":[\"...\"],\"comment\":\"...\",\"availability_status\":\"available\",\"confidence\":0.94,\"warnings\":[]}]} Правила: обработай только строки из текущего чанка. Не добавляй строки, которых нет во входе. row_number верни значение row_number из входа. unit_code один из шт, кг, г, л, мл. Если единица неясна, unit_code пустой, confidence ниже 0.8, warning unit_unknown. Цена только числом в RUB, разделитель точка. Не выдумывай supplier_sku, если артикула нет. raw_name сохраняет исходное название. normalized_name без цены.'\n    },\n    {\n      role: 'user',\n      content: `Поставщик: ${$json.supplier_name}\\nUpload ID: ${$json.upload_id}\\nИсточник: ${$json.source_channel}\\nЧанк: ${$json.chunk_index || 1}/${$json.chunk_total || 1}\\nСтроки: ${$json.chunk_start_row ?? ''}-${$json.chunk_end_row ?? ''}\\n\\nДанные прайса:\\n${$json.ai_input_text}`\n    }\n  ]\n})}}",
+        "options": {
+          "timeout": 110000
+        }
+      },
+      "id": "93e9e774-6f18-42b9-b2c5-4462897c01a2",
+      "name": "Normalize Supplier Price AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2256,
+        3648
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function stripCodeFence(value) {\n  return String(value ?? '').replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n}\nfunction pickAiText(json) {\n  const value = json.ai_raw_output\n    ?? json.output\n    ?? json.text\n    ?? json.content\n    ?? json.message?.content\n    ?? json.choices?.[0]?.message?.content\n    ?? json.data?.choices?.[0]?.message?.content\n    ?? json.body?.choices?.[0]?.message?.content\n    ?? json.response?.choices?.[0]?.message?.content\n    ?? '';\n  return typeof value === 'object' ? JSON.stringify(value) : value;\n}\nfunction normalizeDecimal(value, fallback = null) {\n  if (value === null || value === undefined || value === '') return fallback;\n  const normalized = String(value).replace(/\\s+/g, '').replace(',', '.').replace(/[^\\d.]/g, '');\n  if (!normalized) return fallback;\n  const number = Number(normalized);\n  if (!Number.isFinite(number)) return fallback;\n  return number.toFixed(2);\n}\nfunction normalizeQty(value, fallback = null) {\n  if (value === null || value === undefined || value === '') return fallback;\n  const normalized = String(value).replace(/\\s+/g, '').replace(',', '.').replace(/[^\\d.]/g, '');\n  if (!normalized) return fallback;\n  const number = Number(normalized);\n  if (!Number.isFinite(number)) return fallback;\n  return number.toFixed(4);\n}\nfunction normalizeConfidence(value) {\n  const number = Number(value);\n  if (!Number.isFinite(number)) return '0.8000';\n  return Math.max(0, Math.min(1, number)).toFixed(4);\n}\nfunction normalizeUnit(value) {\n  const raw = String(value ?? '').trim().toLowerCase();\n  const aliases = {\n    'шт': 'шт', 'штука': 'шт', 'штуки': 'шт', 'pcs': 'шт', 'pc': 'шт',\n    'кг': 'кг', 'kg': 'кг', 'килограмм': 'кг',\n    'г': 'г', 'гр': 'г', 'gram': 'г', 'g': 'г',\n    'л': 'л', 'литр': 'л', 'l': 'л',\n    'мл': 'мл', 'ml': 'мл',\n  };\n  return aliases[raw] ?? raw;\n}\nfunction resolveCurrentChunkContext() {\n  if ($json.upload_id && $json.chat_id && $json.supplier_id) return $json;\n  try { return $('Validate AI Chunk').item.json; } catch (error) {}\n  try { return $('Loop Over AI Chunks').item.json; } catch (error) {}\n  try { return $('Prepare AI Input From Spreadsheet').item.json; } catch (error) {}\n  try { return $('Prepare AI Input From Text').item.json; } catch (error) {}\n  return null;\n}\nfunction resolveRowNumber(value, index, contextRows) {\n  const rows = Array.isArray(contextRows) ? contextRows : [];\n  const number = Number(value);\n  if (Number.isFinite(number) && number > 0) {\n    const absoluteMatch = rows.find((row) => Number(row.row_number) === number);\n    if (absoluteMatch) return Number(absoluteMatch.row_number);\n    const relativeMatch = rows[Math.trunc(number) - 1];\n    if (relativeMatch?.row_number) return Number(relativeMatch.row_number);\n    return Math.trunc(number);\n  }\n  return Number(rows[index]?.row_number ?? index + 1);\n}\n\nconst context = resolveCurrentChunkContext();\nif (!context?.upload_id || !context?.chat_id || !context?.supplier_id) {\n  throw new Error('Cannot resolve upload_id/chat_id/supplier_id context for AI result.');\n}\nif ($json.error) {\n  throw new Error(`AI request failed: ${JSON.stringify($json.error).slice(0, 500)}`);\n}\n\nconst aiText = stripCodeFence(pickAiText($json));\nif (!aiText) throw new Error(`AI response does not contain message content. Keys: ${Object.keys($json).join(', ')}`);\n\nlet parsed;\ntry {\n  parsed = JSON.parse(aiText);\n} catch (error) {\n  throw new Error(`AI вернул невалидный JSON: ${error.message}. Raw: ${aiText.slice(0, 500)}`);\n}\nconst products = Array.isArray(parsed.products) ? parsed.products : [];\nconst backendProducts = products.map((product, index) => {\n  const warnings = Array.isArray(product.warnings) ? product.warnings.map(String) : [];\n  const packageValue = String(product.package ?? product.package_info ?? '').trim();\n  return {\n    row_number: resolveRowNumber(product.row_number, index, context.rows),\n    raw_name: String(product.raw_name ?? product.name ?? '').trim(),\n    normalized_name: String(product.normalized_name ?? '').trim(),\n    supplier_sku: product.supplier_sku ? String(product.supplier_sku).trim() : null,\n    price: normalizeDecimal(product.price),\n    currency: product.currency ? String(product.currency).trim() : 'RUB',\n    unit_code: normalizeUnit(product.unit_code ?? product.unit ?? ''),\n    package_info: packageValue || null,\n    brand: product.brand ? String(product.brand).trim() : null,\n    volume: product.volume ? String(product.volume).trim() : null,\n    volume_unit: product.volume_unit ? String(product.volume_unit).trim() : null,\n    weight: product.weight ? String(product.weight).trim() : null,\n    weight_unit: product.weight_unit ? String(product.weight_unit).trim() : null,\n    min_order_qty: normalizeQty(product.min_order_qty, null),\n    multiplicity: normalizeQty(product.multiplicity, null),\n    category_path: Array.isArray(product.category_path) ? product.category_path.map(String) : [],\n    comment: product.comment ? String(product.comment).trim() : null,\n    availability_status: product.availability_status ? String(product.availability_status).trim() : 'available',\n    confidence: normalizeConfidence(product.confidence),\n    warnings,\n  };\n});\nreturn {\n  json: {\n    chat_id: context.chat_id,\n    supplier_id: context.supplier_id,\n    supplier_name: context.supplier_name,\n    upload_id: context.upload_id,\n    chunk_index: context.chunk_index ?? 1,\n    chunk_total: context.chunk_total ?? 1,\n    chunk_start_row: context.chunk_start_row ?? null,\n    chunk_end_row: context.chunk_end_row ?? null,\n    rows: context.rows ?? [],\n    ai_input_text: context.ai_input_text,\n    ai_payload: {\n      schema_version: 'supplier_price_ai.v1',\n      supplier_id: context.supplier_id,\n      upload_id: context.upload_id,\n      source_channel: context.source_channel,\n      processing_version: String(parsed.processing_version ?? `n8n-demo-2026-06-18-chunk-${context.chunk_index ?? 1}`),\n      supplier_name: String(parsed.supplier_name ?? context.supplier_name),\n      products: backendProducts,\n    },\n  },\n};"
+      },
+      "id": "96b28804-ea14-4167-9d67-8f115f6e3c38",
+      "name": "Build Apply AI Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/{{$json.upload_id}}/apply-ai-result",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.ai_payload)}}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "90d0be1c-4938-40a3-bc62-aae51d09b902",
+      "name": "Apply AI Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2112,
+        3216
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let apply = null;\ntry { apply = $('Aggregate AI Apply Results').first().json; } catch(e) {}\nif (!apply || !apply.items_total) {\n  try { apply = $('Fetch Upload Stats').first().json; } catch(e) {}\n}\nif (!apply || !apply.items_total) {\n  try { apply = $('Get Confirmed Upload From State').first().json; } catch(e) {}\n}\nif (!apply) { apply = $json; }\n\nconst total = Number(apply.items_total ?? 0);\nconst created = Number(apply.products_created ?? 0);\nconst updated = Number(apply.products_updated ?? 0);\nconst prices = Number(apply.prices_created ?? 0);\nconst needsReview = Number(apply.needs_review ?? 0);\nconst chatId = apply.chat_id ?? $('Normalize Incoming Telegram Message').first().json.chat_id;\nconst supplierId = apply.supplier_id ?? '';\n\nconst lines = [\n  'Прайс загружен и подтверждён! ✅',\n];\n\nif (total > 0) {\n  lines.push('', `📊 Всего позиций: ${total}`, `🆕 Новых товаров: ${created}`, `🔄 Обновлено: ${updated}`, `💰 Новых цен: ${prices}`);\n  if (needsReview > 0) lines.push(`⚠️ Требуют проверки: ${needsReview}`);\n}\n\nif (supplierId) {\n  lines.push('', `📋 Ваши товары: https://avtosnab.testant.online/supplier/${supplierId}/`);\n}\n\nreturn { json: { chat_id: chatId, message_text: lines.join('\\n') } };"
+      },
+      "id": "37b49ead-8889-4d40-a4a4-4c797d9a33c7",
+      "name": "Build Upload Summary Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3568,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Build Upload Summary Message').first().json.chat_id}}",
+        "text": "={{$('Build Upload Summary Message').first().json.message_text}}",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "id": "e139b7f0-5116-410f-98a3-e6931c837170",
+      "name": "Send Upload Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3872,
+        2992
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/products",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "supplier_id",
+              "value": "={{$json.supplier_id}}"
+            },
+            {
+              "name": "status",
+              "value": "active"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "69c0989f-90fa-4eca-a153-a673285b11ea",
+      "name": "Get Supplier Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -992,
+        5056
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = Array.isArray($json.results) ? $json.results : [];\nconst lines = ['📋 Ваши товары:'];\nif (rows.length === 0) {\n  lines.push('', 'Пока товаров нет. Загрузите прайс — и они появятся здесь.');\n} else {\n  lines.push('');\n  for (const row of rows.slice(0, 20)) {\n    const name = row.supplier_normalized_name || row.supplier_raw_name || '—';\n    const price = row.current_price?.price ?? row.price ?? '';\n    const currency = row.current_price?.currency ?? 'руб';\n    const unit = row.unit?.code ?? row.unit ?? '';\n    lines.push(`• ${name}: ${price} ${currency}/${unit}`.trim());\n  }\n  if (rows.length > 20) lines.push(`\\n...и ещё ${rows.length - 20}`);\n}\nreturn { json: { chat_id: $('Normalize Incoming Telegram Message').first().json.chat_id, message_text: lines.join('\\n') } };"
+      },
+      "id": "883ce27b-588b-49b9-97c5-4b3a069257ed",
+      "name": "Build Products List Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        5056
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$json.chat_id}}",
+        "text": "={{$json.message_text}}",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "id": "badfbbe4-47fd-4de7-a413-8ac77c63d8b6",
+      "name": "Send Products List",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        5056
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Я помогу загрузить ваш прайс-лист.\n\nПросто отправьте файл (Excel, PDF, Word, фото) или напишите позиции текстом — я распознаю товары и цены.\n\nЕсли что-то не получается — свяжитесь с менеджером.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Связаться с менеджером",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "b3360e5e-771e-4523-bb28-904b6bff56b9",
+      "name": "Send Help Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        5328
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $('Normalize Incoming Telegram Message').first().json;\nconst context = $json;\nconst text = String(incoming.text ?? '').trim();\nconst priceMatch = text.match(/(?:на|=)?\\s*(\\d+[\\d\\s]*(?:[,.]\\d+)?)\\s*(?:руб|р|₽)?\\s*$/i);\nif (!priceMatch) throw new Error('Не удалось выделить цену из команды.');\nconst price = Number(priceMatch[1].replace(/\\s+/g, '').replace(',', '.'));\nif (!Number.isFinite(price) || price <= 0) throw new Error('Цена должна быть положительным числом.');\nlet productQuery = text.replace(/^(измени|обнови|поменяй|поставь)\\s+/i, '').replace(/цену\\s+(на\\s+)?/i, '').replace(/\\s+на\\s+\\d+[\\d\\s]*(?:[,.]\\d+)?\\s*(?:руб|р|₽)?\\s*$/i, '').trim();\nif (!productQuery) throw new Error('Не удалось выделить товар из команды.');\nreturn {\n  json: {\n    chat_id: incoming.chat_id,\n    supplier_id: context.supplier_id,\n    supplier_name: context.supplier_name,\n    product_query: productQuery,\n    price: price.toFixed(2),\n    currency: 'RUB'\n  }\n};"
+      },
+      "id": "361be697-5852-4fc4-9c8f-eec9c6c6c039",
+      "name": "Parse Update Price Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        4336
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/products",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "supplier_id",
+              "value": "={{$json.supplier_id}}"
+            },
+            {
+              "name": "status",
+              "value": "active"
+            },
+            {
+              "name": "q",
+              "value": "={{$json.product_query}}"
+            },
+            {
+              "name": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "a5de00f3-a884-46b5-b9a7-60c8a53a4c38",
+      "name": "Search Product For Price Command",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -624,
+        4336
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Update Price Command').first().json;\nconst results = Array.isArray($json.results) ? $json.results : [];\nif (results.length !== 1) {\n  const lines = results.length === 0\n    ? ['Не нашёл такой товар. Попробуйте уточнить название.']\n    : ['Нашёл несколько похожих товаров. Уточните, какой именно:', ...results.map((row, i) => `${i + 1}. ${row.supplier_normalized_name || row.supplier_raw_name}`)];\n  return { json: { resolved: false, chat_id: parsed.chat_id, message_text: lines.join('\\n') } };\n}\nconst product = results[0];\nreturn { json: { resolved: true, chat_id: parsed.chat_id, supplier_id: parsed.supplier_id, product_id: product.id, product_name: product.supplier_normalized_name || product.supplier_raw_name, price: parsed.price, currency: parsed.currency } };"
+      },
+      "id": "464975a1-c379-4e66-bb10-17891b90b729",
+      "name": "Select Product Price Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        4336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.resolved}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "579197d4-181e-4ad9-8cea-9006bf34a579"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6f309b0f-3880-4962-af5c-67dc6076df08",
+      "name": "Is Price Candidate Resolved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -32,
+        4336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/products/{{$json.product_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "price",
+              "value": "={{$json.price}}"
+            },
+            {
+              "name": "comment",
+              "value": "обновлено через Telegram/n8n command"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "5d8faa72-e65a-48b2-9b6f-188e0c9dccce",
+      "name": "Patch Product Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        4144
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$json.chat_id}}",
+        "text": "={{$json.message_text}}",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "id": "4a0667e1-9d42-47ae-b635-93c826308aac",
+      "name": "Send Candidate Clarification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        4400
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Env vars required in n8n:\nBACKEND_BASE_URL\nSERVICE_API_TOKEN\nTELEGRAM_BOT_TOKEN\nAI_BASE_URL\nAI_API_KEY\nAI_MODEL\nGOOGLE_SHEET_ID\n\nAfter import assign Telegram and Google Sheets credentials, then activate the workflow. Telegram inline buttons work only when production Telegram Trigger webhook is registered. Check: getWebhookInfo.url must be non-empty and allowed_updates must include callback_query.",
+        "height": 260,
+        "width": 420
+      },
+      "id": "512e84bc-30ca-4f07-bdfe-82415d787a79",
+      "name": "Required Environment Variables",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3632,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst incoming = $('Normalize Incoming Telegram Message').first().json;\nconst normalization = result.normalization ?? {};\nconst aiRows = Number(normalization.rows_ai_requested ?? 0);\nconst aiResolved = Number(normalization.rows_ai_resolved ?? 0);\nreturn [{\n  json: {\n    chat_id: incoming.chat_id,\n    supplier_id: result.supplier_id ?? null,\n    supplier_name: result.supplier_name ?? null,\n    upload_id: result.upload_id ?? null,\n    status: result.status ?? null,\n    chunks_applied: aiRows > 0 ? Math.ceil(aiRows / 20) : 0,\n    items_total: Number(result.items_total ?? 0),\n    products_created: Number(result.products_created ?? 0),\n    products_updated: Number(result.products_updated ?? 0),\n    prices_created: Number(result.prices_created ?? 0),\n    needs_review: Number(result.needs_review ?? 0),\n    items_matched: Number(result.items_matched ?? 0),\n    normalization,\n    rows_ai_requested: aiRows,\n    rows_ai_resolved: aiResolved,\n    backend_result: result,\n  }\n}];"
+      },
+      "id": "5e958e10-25a3-4886-99e2-8d7921cf872c",
+      "name": "Aggregate AI Apply Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        2592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5a49db97-5dce-4fc4-81ea-4dda46bbaf11",
+              "leftValue": "={{ $json.exists === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "624abf72-678a-48e2-88da-5f64d7ec2e9f",
+              "leftValue": "={{ Boolean($json.supplier_id) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "884654ed-2d90-4a04-99bf-b582281a0c2a",
+      "name": "Check Binding Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2144,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_cancel_registration",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "b5e20207-bdb3-43ea-b506-bbf626b4774f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancel_registration"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "file_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3182c128-5a77-4703-bc00-b18bdf91b50a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "file_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.message_type}}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e4ff4295-7c3d-413c-99c0-845d836310f4"
+                  },
+                  {
+                    "leftValue": "={{['waiting_invite_code','pending_price_upload'].includes($json.state)}}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "fa239924-6ccd-469a-99ef-aca5338c49dc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invite_code"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "contact_manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "contact_manager-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "contact_manager"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "supplier_main_menu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "supplier_main_menu-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "supplier_main_menu"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "greeting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "greeting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "thanks",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "thanks"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "question",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "question"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "wants_upload",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "wants_upload"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "unknown_text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unknown_text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "callback_upload_new_price",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "unreg-upload-new-price-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "upload_new_price"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "show_products",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "unreg-show-products-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "show_products"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "open_cabinet",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "unreg-open-cabinet-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "open_cabinet"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$('Normalize Incoming Telegram Message').first().json.route}}",
+                    "rightValue": "deep_link_register",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "deep-link-register-route"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "deep_link_register"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "19bc95e8-fe45-4a07-91a8-b142d66c16d2",
+      "name": "Route Unregistered User",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1840,
+        3648
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-bindings/pending-actions",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "action_type",
+              "value": "upload_price"
+            },
+            {
+              "name": "file_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.file_id}}"
+            },
+            {
+              "name": "file_name",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.file_name}}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.message_id}}"
+            },
+            {
+              "name": "status",
+              "value": "pending_registration"
+            },
+            {
+              "name": "mime_type",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.mime_type}}"
+            },
+            {
+              "name": "raw_payload",
+              "value": "={{JSON.stringify({source:'telegram', received_at:$('Normalize Incoming Telegram Message').first().json.received_at, n8n_execution_id:$('Normalize Incoming Telegram Message').first().json.n8n_execution_id})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "b4496823-923a-460e-9147-a5eb3d960d8a",
+      "name": "Save Pending Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        3792
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Привет! Чтобы загрузить прайс, сначала нужно привязать вашу компанию.\n\nЗайдите в личный кабинет поставщика и нажмите «Присоединиться к Telegram-боту» — вы автоматически попадёте сюда уже привязанным.\n\nЕсли нет доступа к кабинету — свяжитесь с менеджером.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Написать менеджеру",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Отмена",
+                    "additionalFields": {
+                      "callback_data": "cancel_registration"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "f73ddacc-1405-4b47-a465-8c3e3c182f65",
+      "name": "Send Registration Required",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        3792
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Регистрация отменена.\n\nВаш файл сохранён — когда будете готовы, можно продолжить.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Написать менеджеру",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "4dafdefd-54d2-45bf-81b7-76d57a613db9",
+      "name": "Send Registration Cancelled",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        3552
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-bindings/register",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "username",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.username}}"
+            },
+            {
+              "name": "first_name",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.first_name}}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.last_name}}"
+            },
+            {
+              "name": "link_token",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.start_payload || $('Normalize Incoming Telegram Message').first().json.text}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "d64a8ca8-c7ca-46b3-8992-582474305287",
+      "name": "Register Supplier Binding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        4048
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "30315905-5fde-48a7-9b47-a8517f5292b3",
+              "leftValue": "={{$json.success === true}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a70c1df5-2314-4861-a843-767448ec3efa",
+      "name": "Is Registration Successful",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -336,
+        4048
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "={{$json.pending_action ? `Готово! Компания «${$json.supplier_name ?? \"поставщик\"}» привязана.\\n\\nМы нашли ваш файл — начинаю обработку.` : `Готово! Компания «${$json.supplier_name ?? \"поставщик\"}» привязана.\\n\\nТеперь можете загрузить прайс.`}}",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "id": "e4252b13-b5a2-4b40-9349-cc33f7fc8f85",
+      "name": "Send Registration Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        3952
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "={{$json.code === \"SUPPLIER_INACTIVE\" ? \"Эта компания сейчас неактивна. Свяжитесь с менеджером АвтоСнаб — он поможет разобраться.\" : \"Ссылка недействительна или устарела. Вернитесь в личный кабинет и нажмите «Присоединиться к Telegram-боту» ещё раз.\"}}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Написать менеджеру",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Отмена",
+                    "additionalFields": {
+                      "callback_data": "cancel_registration"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "a8428b3e-fd56-41bc-bb17-bcf7fd564bd9",
+      "name": "Send Invalid Invite Code",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        4144
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-bindings/pending-actions",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "action_type",
+              "value": "upload_price"
+            },
+            {
+              "name": "status",
+              "value": "ready_for_processing,pending_registration,waiting_registration"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "5bd13440-f37f-4b66-9ce0-7f3558b91376",
+      "name": "Get Latest Pending Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1536,
+        1440
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c701d94c-f2ef-4ec3-b9c0-56bf2a8451e3",
+              "leftValue": "={{$json.exists === true && Boolean($json.pending_action?.file_id)}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4d9c204e-ef3a-45ab-926b-dd23edf0d051",
+      "name": "Is Pending Upload Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1232,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $('Normalize Incoming Telegram Message').first().json;\nlet binding = null;\ntry { binding = $('Register Supplier Binding').first().json.binding; } catch (error) {}\nif (!binding) { try { binding = $('Resolve Supplier Binding').first().json.binding; } catch (error) {} }\nconst pending = $json.pending_action;\nreturn { json: { ...incoming, binding, supplier_id: pending.supplier_id ?? binding?.supplier_id ?? null, supplier_name: binding?.supplier_name ?? null, file_id: pending.file_id, file_name: pending.file_name, mime_type: pending.mime_type ?? incoming.mime_type, message_id: pending.message_id, pending_action_id: pending.id, route: 'file_upload' } };"
+      },
+      "id": "44856c23-ddbb-40f3-84ed-9670ad903d21",
+      "name": "Restore Pending Upload Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        1440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-states/current",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.platform}}"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            }
+          ]
+        },
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "4b34c6f7-34e0-4687-94df-ef015637e037",
+      "name": "Get Bot User State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2736,
+        2848
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $('Normalize Incoming Telegram Message').first().json;\nconst resolved = $('Resolve Supplier Binding').first().json;\nconst stateResponse = $json;\nconst binding = resolved?.binding ?? null;\nreturn {\n  json: {\n    ...incoming,\n    ...resolved,\n    supplier_id: binding?.supplier_id ?? resolved?.supplier_id ?? null,\n    supplier_name: binding?.supplier_name ?? resolved?.supplier_name ?? null,\n    state: stateResponse.state ?? 'idle',\n    bot_user_state: stateResponse.bot_user_state ?? null,\n  },\n};"
+      },
+      "id": "000d7e77-5814-4752-b387-3995813722fb",
+      "name": "Merge Binding And State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-states/current",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "state",
+              "value": "registration_cancelled"
+            },
+            {
+              "name": "payload",
+              "value": "={{JSON.stringify({source:'cancel_registration', callback_data:$('Normalize Incoming Telegram Message').first().json.callback_data})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "0278d00a-7c92-4621-ba19-815455907cf7",
+      "name": "Set Registration Cancelled State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -928,
+        3552
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Отправьте файл с прайсом — я его обработаю.\n\nПринимаю: Excel (.xlsx, .csv), PDF, Word, фото прайса или просто текст.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "12ecae32-39aa-48f5-9469-f956d708d9fd",
+      "name": "Send Upload New Price Request",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        5936
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-states/current",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "state",
+              "value": "price_processing"
+            },
+            {
+              "name": "payload",
+              "value": "={{JSON.stringify({source:'file_upload', file_id:$('Normalize Incoming Telegram Message').first().json.file_id})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "1a21cfcd-e029-48db-b3c1-4b696eab8e31",
+      "name": "Set Price Processing State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1536,
+        1904
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-bindings/pending-actions/{{$json.pending_action_id}}",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "price_processing"
+            },
+            {
+              "name": "supplier_id",
+              "value": "={{$json.supplier_id}}"
+            },
+            {
+              "name": "raw_payload",
+              "value": "={{JSON.stringify({source:\"registration_success\", file_id:$json.file_id, file_name:$json.file_name})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "9bd1d755-c26d-491a-a66d-fedce51a9924",
+      "name": "Mark Pending Upload Price Processing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        1440
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-states/current",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$json.chat_id ?? $('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "state",
+              "value": "price_processed"
+            },
+            {
+              "name": "payload",
+              "value": "={{JSON.stringify({upload_id:$json.upload_id})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "a870d2a8-7ae2-4fe6-a271-fe5733dc1c75",
+      "name": "Set Price Processed State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4176,
+        2992
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Что хотите сделать?",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📋 Мои товары",
+                    "additionalFields": {
+                      "callback_data": "show_products"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🏢 Мой кабинет",
+                    "additionalFields": {
+                      "callback_data": "open_cabinet"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❓ Помощь",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "0677747e-3ef5-402b-a255-fd75f9a3366b",
+      "name": "Send Supplier Main Menu",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        5632
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-callback-query-condition",
+              "leftValue": "={{$json.is_callback_query === true && Boolean($json.callback_query_id)}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8fb50211-0b64-40be-b73c-acffef782ec1",
+      "name": "Is Callback Query",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3040,
+        3152
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{$json.callback_query_id}}",
+        "additionalFields": {}
+      },
+      "id": "e2b609bb-f2b4-4920-ab0b-df30f760b587",
+      "name": "Answer Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2736,
+        3152
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $json;\nconst binding = result?.binding ?? null;\nreturn {\n  json: {\n    ...result,\n    supplier_id: binding?.supplier_id ?? result?.supplier_id ?? null,\n    supplier_name: binding?.supplier_name ?? result?.supplier_name ?? null,\n  },\n};"
+      },
+      "id": "e1dadadf-81ae-4395-b1eb-adec083c051e",
+      "name": "Normalize Registration Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        4048
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/{{$json.id}}/normalize",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify({ use_ai: true, ai_mode: 'ambiguous', run_async: true, force: true })}}",
+        "options": {
+          "timeout": 120000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "f73d944a-bfb6-49de-a65d-755a7a5b1b1f",
+      "name": "Normalize Upload In Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        1696
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "7302b387-124c-43d9-a7e1-4ee8d24d7c93",
+      "name": "Wait Backend Normalization",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1168,
+        1696
+      ],
+      "webhookId": "9e43e632-7ca8-4c4f-8134-76b06a986645"
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/{{$('Normalize Upload In Backend').first().json.upload_id}}",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "a4466116-c0b4-4a66-a3ea-fb339b575eba",
+      "name": "Get Upload Normalization Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1472,
+        1696
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ef72dc17-86ef-40dd-99a7-cae0b6de1296",
+              "leftValue": "={{ ['applied', 'needs_review', 'failed'].includes($json.status) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "1d774749-2499-43a9-a14a-5176e5c521e5",
+      "name": "Is Upload Normalization Finished",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        1696
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Получили ваше фото — попробуем распознать текст.\n\nДля лучшего результата отправьте файл в формате Excel (.xlsx) или PDF.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Помощь",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "33e257b9-feca-4fab-a42f-16c9e7f24840",
+      "name": "Send Photo Not Supported",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        6240
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "К сожалению, голосовые сообщения я пока не понимаю.\n\nОтправьте прайс файлом (Excel, PDF, Word, фото) или напишите позиции текстом.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Помощь",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "daac8c64-8896-4984-9d6a-ee1156da8193",
+      "name": "Send Voice Not Supported",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        6544
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Этот формат файла я пока не могу обработать.\n\nОтправьте прайс в одном из форматов:\n• Excel (.xlsx, .csv)\n• PDF или Word\n• Фото прайса\n• Или просто напишите позиции текстом",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Помощь",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "bc682ce5-ed08-4974-b475-7ffcba0ef6e1",
+      "name": "Send Unsupported Format",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        6848
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Не совсем понял, что вы отправили.\n\nЧтобы загрузить прайс — отправьте файл или напишите позиции текстом.\nИли выберите действие из меню.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Помощь",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "65ac6128-0323-4d54-ac9d-225cbeb390d5",
+      "name": "Send Unsupported Message Type",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        7152
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://avtosnab.testant.online/api/v1/bot-user-states/current",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "state",
+              "value": "awaiting_upload_confirmation"
+            },
+            {
+              "name": "payload",
+              "value": "={{JSON.stringify({upload_id: $('Aggregate AI Apply Results').first().json.upload_id, supplier_id: $('Aggregate AI Apply Results').first().json.supplier_id, supplier_name: $('Aggregate AI Apply Results').first().json.supplier_name})}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "13d3e09d-a8c9-4068-88ea-ee1d24baaaa5",
+      "name": "Set State Awaiting Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2064,
+        2400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Merge Binding And State').first().json;\nlet payload = state.bot_user_state?.payload ?? state.payload ?? {};\nif (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch(e) { payload = {}; } }\nconst uploadId = payload.upload_id ?? null;\nif (!uploadId) throw new Error('No upload_id in bot state for confirmation');\nreturn { json: { ...state, upload_id: uploadId, supplier_id: payload.supplier_id ?? state.supplier_id, supplier_name: payload.supplier_name ?? state.supplier_name } };"
+      },
+      "id": "471a1391-7e4d-4beb-944b-b3595601618b",
+      "name": "Get Confirmed Upload From State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Загрузка отклонена.\n\nМожете отправить файл заново — я обработаю его снова.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "8f0606a1-2cf1-44e7-9670-0d4c5861e43a",
+      "name": "Send Rejection Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -992,
+        2064
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Файл получен ✓\n\nРаспознаю товары и цены — это займёт 1–3 минуты.\nНапишу, когда будет готово.",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        1696
+      ],
+      "id": "send-processing-started-001",
+      "name": "Send Processing Started",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sendResult = $('Send Processing Started').first().json;\nconst processingMsgId = sendResult?.result?.message_id ?? null;\n\nlet items = [];\ntry { items = $('Create Upload - File').all(); } catch(e) {}\nif (!items.length) { try { items = $('Create Upload - Text').all(); } catch(e) {} }\nif (!items.length) { items = $input.all(); }\n\nreturn items.map(item => ({\n  json: { ...item.json, processing_message_id: processingMsgId }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        1696
+      ],
+      "id": "restore-upload-data-001",
+      "name": "Restore Upload Data"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "={{(() => { const r = $('Aggregate AI Apply Results').first().json; const url = 'https://avtosnab.testant.online/supplier/' + r.supplier_id + '/'; const hasChanges = (r.products_created > 0 || r.prices_created > 0 || r.needs_review > 0); const lines = ['Ваш прайс обработан ✓', '']; lines.push(`📊 Всего позиций: ${r.items_total}`); if (r.products_created > 0) lines.push(`🆕 Новых товаров: ${r.products_created}`); if (r.prices_created > 0) lines.push(`💰 Обновлено цен: ${r.prices_created}`); if (r.items_matched > 0) lines.push(`📌 Без изменений: ${r.items_matched}`); if (r.needs_review > 0) lines.push(`⚠️ Требуют проверки: ${r.needs_review}`); lines.push('', `📋 Ваши товары: ${url}`); if (hasChanges) { lines.push('', 'Если всё верно — нажмите «Подтвердить».'); } else { lines.push('', 'Изменений нет — всё актуально.'); } return lines.join('\\n'); })()}}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ ($('Aggregate AI Apply Results').first().json.products_created > 0 || $('Aggregate AI Apply Results').first().json.prices_created > 0 || $('Aggregate AI Apply Results').first().json.needs_review > 0) ? '✅ Подтвердить' : '📎 Загрузить другой прайс' }}",
+                    "additionalFields": {
+                      "callback_data": "={{ ($('Aggregate AI Apply Results').first().json.products_created > 0 || $('Aggregate AI Apply Results').first().json.prices_created > 0 || $('Aggregate AI Apply Results').first().json.needs_review > 0) ? 'confirm_upload' : 'upload_new_price' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ ($('Aggregate AI Apply Results').first().json.products_created > 0 || $('Aggregate AI Apply Results').first().json.prices_created > 0 || $('Aggregate AI Apply Results').first().json.needs_review > 0) ? '❌ Отклонить' : 'Главное меню' }}",
+                    "additionalFields": {
+                      "callback_data": "={{ ($('Aggregate AI Apply Results').first().json.products_created > 0 || $('Aggregate AI Apply Results').first().json.prices_created > 0 || $('Aggregate AI Apply Results').first().json.needs_review > 0) ? 'reject_upload' : 'supplier_main_menu' }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2600,
+        1696
+      ],
+      "id": "send-upload-result-001",
+      "name": "Send Upload Result",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Здравствуйте! Чем могу помочь?\n\nОтправьте файл с прайсом или выберите действие из меню.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📋 Мои товары",
+                    "additionalFields": {
+                      "callback_data": "show_products"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❓ Помощь",
+                    "additionalFields": {
+                      "callback_data": "help"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        3200
+      ],
+      "id": "send-greeting-001",
+      "name": "Send Greeting",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Рады помочь! Если нужно что-то ещё — выберите действие из меню.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📋 Мои товары",
+                    "additionalFields": {
+                      "callback_data": "show_products"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        3400
+      ],
+      "id": "send-thanks-001",
+      "name": "Send Thanks",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Этот бот помогает загружать прайс-листы в систему АвтоСнаб.\n\nЧто я умею:\n• Принять ваш прайс — файлом, фото или текстом\n• Распознать товары и цены\n• Показать результат для проверки\n\nКак обновить цены?\nПросто отправьте новый прайс — я сравню с текущими данными.\n\nЕсли что-то не получается — напишите менеджеру.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Написать менеджеру",
+                    "additionalFields": {
+                      "callback_data": "contact_manager"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        3600
+      ],
+      "id": "send-question-answer-001",
+      "name": "Send Question Answer",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "Отправьте файл с вашим прайсом — я распознаю товары и цены.\n\nПодходят: Excel, PDF, Word, фото таблицы или текст.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        3800
+      ],
+      "id": "send-wants-upload-001",
+      "name": "Send Upload Instructions",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "deleteMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "messageId": "={{$('Normalize Incoming Telegram Message').first().json.message_id}}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3200,
+        1200
+      ],
+      "id": "delete-confirm-msg-001",
+      "name": "Delete Confirm Message",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "deleteMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "messageId": "={{$('Normalize Incoming Telegram Message').first().json.message_id}}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3200,
+        1400
+      ],
+      "id": "delete-reject-msg-001",
+      "name": "Delete Reject Message",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/{{$json.upload_id}}",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3000,
+        1000
+      ],
+      "id": "fetch-upload-stats-001",
+      "name": "Fetch Upload Stats",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "deleteMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "messageId": "={{$('Restore Upload Data').first().json.processing_message_id}}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2500,
+        1696
+      ],
+      "id": "delete-processing-msg-001",
+      "name": "Delete Processing Message",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "={{(() => { const sid = $json.supplier_id || ''; const url = 'https://avtosnab.testant.online/supplier/' + sid + '/'; return '📋 Ваши товары:\\n' + url + '\\n\\nНа этой странице вы можете просмотреть, отредактировать и удалить товары.'; })()}}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "📎 Загрузить прайс",
+                    "additionalFields": {
+                      "callback_data": "upload_new_price"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        2400
+      ],
+      "id": "send-products-link-001",
+      "name": "Send Products Link",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/cabinet/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "platform",
+              "value": "telegram"
+            },
+            {
+              "name": "chat_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}"
+            },
+            {
+              "name": "telegram_user_id",
+              "value": "={{$('Normalize Incoming Telegram Message').first().json.telegram_user_id}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        4000
+      ],
+      "id": "generate-cabinet-token-001",
+      "name": "Generate Cabinet Token",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b3a1a4b1-5c8e-4b6a-9f2d-3a7e6c1d9f44",
+              "leftValue": "={{ Boolean($json.token) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        4100
+      ],
+      "id": "check-cabinet-token-issued-001",
+      "name": "Check Cabinet Token Issued"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "text": "={{`🏢 Ваш кабинет:\\nhttps://avtosnab.testant.online/supplier/cabinet?token=${$json.token}\\n\\nНа этой странице — информация о вашей компании, история загрузок и товары.\\nСсылка действует 30 минут.`}}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Главное меню",
+                    "additionalFields": {
+                      "callback_data": "supplier_main_menu"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        4200
+      ],
+      "id": "send-cabinet-link-001",
+      "name": "Send Cabinet Link",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $('Merge Binding And State').first().json;\nlet payload = state.bot_user_state?.payload ?? state.payload ?? {};\nif (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch(e) { payload = {}; } }\nconst uploadId = payload.upload_id ?? null;\nreturn { json: { ...state, upload_id: uploadId } };"
+      },
+      "id": "get-rejected-upload-from-state-001",
+      "name": "Get Rejected Upload From State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://avtosnab.testant.online/api/v1/suppliers/uploads/{{$json.upload_id}}/reject",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "reject-upload-http-001",
+      "name": "Reject Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2950,
+        1400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME_SERVICE_TOKEN_CRED_ID",
+          "name": "AutoSnab Service Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "editMessageText",
+        "messageType": "message",
+        "chatId": "={{$('Normalize Incoming Telegram Message').first().json.chat_id}}",
+        "messageId": "={{$('Send Processing Started').first().json.result.message_id}}",
+        "text": "={{(() => { const p = $json.normalization?.progress || {}; const total = p.chunks_total || 0; const done = p.chunks_done || 0; const rows = $json.items_total ?? $json.normalization?.rows_total ?? 0; if (total > 0) { const pct = Math.min(100, Math.round((done / total) * 100)); const filled = Math.round(pct / 10); const bar = '▓'.repeat(filled) + '░'.repeat(10 - filled); return `⏳ Распознаю товары и цены...\\n${bar} ${pct}%\\nБлоков: ${done} из ${total}\\nСтрок в файле: ${rows}`; } return `⏳ Распознаю товары и цены...\\nСтрок в файле: ${rows}\\nЭто займёт 1–3 минуты.`; })()}}",
+        "replyMarkup": "none",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        1850
+      ],
+      "id": "send-progress-update-001",
+      "name": "Send Progress Update",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "UB74WRMgogIjamqX",
+          "name": "Telegram account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Incoming Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Incoming Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Is Callback Query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resolve Supplier Binding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Supplier Binding": {
+      "main": [
+        [
+          {
+            "node": "Get Bot User State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Message": {
+      "main": [
+        [
+          {
+            "node": "Set Price Processing State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Upload - Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Update Price Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Products Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Latest Pending Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Upload New Price Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Supplier Main Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Supplier Main Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Supplier Main Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Voice Not Supported",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Confirmed Upload From State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Rejected Upload From State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Thanks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Question Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Upload Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Cabinet Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Format",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Get File Path": {
+      "main": [
+        [
+          {
+            "node": "Create Upload - File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Upload - File": {
+      "main": [
+        [
+          {
+            "node": "Send Processing Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Upload - Text": {
+      "main": [
+        [
+          {
+            "node": "Send Processing Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Upload Summary Message": {
+      "main": [
+        [
+          {
+            "node": "Delete Confirm Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Supplier Products": {
+      "main": [
+        [
+          {
+            "node": "Build Products List Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Products List Message": {
+      "main": [
+        [
+          {
+            "node": "Send Products List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Update Price Command": {
+      "main": [
+        [
+          {
+            "node": "Search Product For Price Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Product For Price Command": {
+      "main": [
+        [
+          {
+            "node": "Select Product Price Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Product Price Candidate": {
+      "main": [
+        [
+          {
+            "node": "Is Price Candidate Resolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Price Candidate Resolved": {
+      "main": [
+        [
+          {
+            "node": "Patch Product Price",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Candidate Clarification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate AI Apply Results": {
+      "main": [
+        [
+          {
+            "node": "Set State Awaiting Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Binding Exists": {
+      "main": [
+        [
+          {
+            "node": "Route Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route Unregistered User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Unregistered User": {
+      "main": [
+        [
+          {
+            "node": "Set Registration Cancelled State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Pending Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Register Supplier Binding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Supplier Main Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Thanks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Question Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Upload Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Registration Required",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Registration Required",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Registration Required",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Register Supplier Binding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Pending Upload": {
+      "main": [
+        [
+          {
+            "node": "Send Registration Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Supplier Binding": {
+      "main": [
+        [
+          {
+            "node": "Normalize Registration Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Registration Successful": {
+      "main": [
+        [
+          {
+            "node": "Send Registration Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Invalid Invite Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest Pending Upload": {
+      "main": [
+        [
+          {
+            "node": "Is Pending Upload Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Pending Upload Found": {
+      "main": [
+        [
+          {
+            "node": "Restore Pending Upload Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Supplier Main Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Pending Upload Context": {
+      "main": [
+        [
+          {
+            "node": "Mark Pending Upload Price Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bot User State": {
+      "main": [
+        [
+          {
+            "node": "Merge Binding And State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Binding And State": {
+      "main": [
+        [
+          {
+            "node": "Check Binding Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Registration Cancelled State": {
+      "main": [
+        [
+          {
+            "node": "Send Registration Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Price Processing State": {
+      "main": [
+        [
+          {
+            "node": "Telegram Get File Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Registration Success": {
+      "main": [
+        [
+          {
+            "node": "Get Latest Pending Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Pending Upload Price Processing": {
+      "main": [
+        [
+          {
+            "node": "Telegram Get File Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Upload Summary": {
+      "main": [
+        [
+          {
+            "node": "Set Price Processed State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback Query": {
+      "main": [
+        [
+          {
+            "node": "Answer Callback Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Registration Result": {
+      "main": [
+        [
+          {
+            "node": "Is Registration Successful",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Upload In Backend": {
+      "main": [
+        [
+          {
+            "node": "Wait Backend Normalization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Backend Normalization": {
+      "main": [
+        [
+          {
+            "node": "Get Upload Normalization Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Upload Normalization Status": {
+      "main": [
+        [
+          {
+            "node": "Is Upload Normalization Finished",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Upload Normalization Finished": {
+      "main": [
+        [
+          {
+            "node": "Aggregate AI Apply Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Progress Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set State Awaiting Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Delete Processing Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Confirmed Upload From State": {
+      "main": [
+        [
+          {
+            "node": "Fetch Upload Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Processing Started": {
+      "main": [
+        [
+          {
+            "node": "Restore Upload Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Upload Data": {
+      "main": [
+        [
+          {
+            "node": "Normalize Upload In Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Upload Result": {},
+    "Delete Confirm Message": {
+      "main": [
+        [
+          {
+            "node": "Send Upload Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Reject Message": {
+      "main": [
+        [
+          {
+            "node": "Send Rejection Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Upload Stats": {
+      "main": [
+        [
+          {
+            "node": "Build Upload Summary Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Processing Message": {
+      "main": [
+        [
+          {
+            "node": "Send Upload Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Cabinet Token": {
+      "main": [
+        [
+          {
+            "node": "Check Cabinet Token Issued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Cabinet Token Issued": {
+      "main": [
+        [
+          {
+            "node": "Send Cabinet Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Registration Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rejected Upload From State": {
+      "main": [
+        [
+          {
+            "node": "Reject Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Upload": {
+      "main": [
+        [
+          {
+            "node": "Delete Reject Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Progress Update": {
+      "main": [
+        [
+          {
+            "node": "Wait Backend Normalization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "451f9b01-2f4e-4838-83af-6148dade0a9e",
+  "meta": {
+    "instanceId": "527e68848b795fb6cfb90ac8c6e3a46e9792f925c935d26e929a888dc76090f0"
+  },
+  "id": "mPQNVmwhwWl-qLR9rKdP-",
+  "tags": []
+}

@@ -1,0 +1,97 @@
+{
+  "module": "api/v1/catalog/serializers.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py"
+  ],
+  "groups": {
+    "common": [
+      "AuditLogEntrySerializer",
+      "NotFoundDetailSerializer",
+      "UUIDListField",
+      "ImportDecisionsErrorSerializer",
+      "supplier_product_display_image_url",
+      "validate_supplier_product_qty",
+      "ProductSuggestionQuerySerializer",
+      "VenueSearch.*",
+      "_validate_import_upload_size"
+    ],
+    "products": [
+      "Catalog(Product|Brand|Category|Country|Supplier).*",
+      "ProductWishlistMembershipSerializer"
+    ],
+    "import_sessions": [
+      "CatalogImport.*",
+      "_CATALOG_IMPORT_CANDIDATES"
+    ],
+    "favorites": [
+      "VenueFavorite.*",
+      "Wishlist.*"
+    ],
+    "orders": [
+      "Cart.*",
+      "VenueCart.*",
+      "Order(Detail|Item|SupplierGroup|SupplierSummary).*",
+      "OrderSerializer",
+      "SupplierOrder.*",
+      "Venue(Mine)?SupplierOrderRow.*",
+      "VenueOrderDetail.*",
+      "Venue(Mine)?Unresolved.*",
+      "OrderAuthorSerializer",
+      "OrderApprovalSummarySerializer",
+      "ApprovalOrderDetailSerializer"
+    ],
+    "order_templates": [
+      "OrderTemplate.*",
+      "SaveOrderAsTemplate.*"
+    ],
+    "venue_structure": [
+      "VenueSubdivision.*",
+      "OffSystemSupplier.*"
+    ],
+    "product_matrix": [
+      "VenueProductMatrix.*"
+    ],
+    "venue_import": [
+      "VenueImport.*"
+    ],
+    "google_sheets": [
+      "GoogleSheet.*"
+    ],
+    "master_catalog": [
+      "MasterProduct.*"
+    ],
+    "tenders": [
+      "Tender.*",
+      "SupplierTender.*"
+    ],
+    "product_lists": [
+      "VenueProductList.*"
+    ],
+    "supplier_prices": [
+      "SupplierProductVenuePrice.*",
+      "SupplierProductIndividualPrice.*"
+    ]
+  },
+  "docstrings": {
+    "common": "Serializers and helpers shared across catalog domains.",
+    "products": "Public catalog: products, brands, categories, countries, suppliers.",
+    "import_sessions": "Catalog import review sessions (Master/Venue).",
+    "favorites": "Venue favorites and wishlists.",
+    "orders": "Venue cart, orders and supplier order requests.",
+    "order_templates": "Venue order templates.",
+    "venue_structure": "Venue subdivisions and off-system suppliers.",
+    "product_matrix": "Venue product matrix (company directory) and supplier matching.",
+    "venue_import": "Venue product import.",
+    "google_sheets": "Google Sheets export and sync log.",
+    "master_catalog": "Master catalog products, imports, venue links and bulk actions.",
+    "tenders": "Tenders: buyer and supplier side.",
+    "product_lists": "Venue product lists.",
+    "supplier_prices": "Supplier product prices per venue and individual prices.",
+    "_shared": "Helpers shared by several catalog serializer modules."
+  }
+}

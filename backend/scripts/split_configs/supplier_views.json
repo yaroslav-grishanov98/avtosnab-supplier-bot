@@ -1,0 +1,65 @@
+{
+  "module": "api/v1/suppliers/views.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py",
+    "autosnab_bots/**/*.py"
+  ],
+  "groups": {
+    "bot": [
+      "Bot.*",
+      "SupplierBotLinkView",
+      "SupplierBotAccountLoginConfirmView"
+    ],
+    "product_import": [
+      "SupplierProductImport.*"
+    ],
+    "price_uploads": [
+      "SupplierPrice.*"
+    ],
+    "registration": [
+      "SupplierCreateView",
+      "SupplierInnLookupView",
+      "SupplierAddressLookupView",
+      "SupplierMineView",
+      "SupplierRestoreView",
+      "SupplierAccountTransfer.*",
+      "SupplierSearchByInnView"
+    ],
+    "team": [
+      "SupplierUser.*",
+      "SupplierInviteLink.*",
+      "SupplierJoinRequest.*"
+    ],
+    "reference": [
+      "Supplier(Unit|Country|Brand|Category)ListView"
+    ],
+    "products": [
+      "SupplierProduct.*",
+      "SupplierCatalogSearch.*",
+      "SupplierVenueSearchView"
+    ],
+    "cabinet": [
+      "CabinetTokenView",
+      "SupplierCabinet.*"
+    ]
+  },
+  "docstrings": {
+    "bot": "Telegram bot endpoints: user binding, pending actions, bot login links.",
+    "product_import": "Unified supplier product import: analyze, review session, commit.",
+    "price_uploads": "Legacy supplier price uploads: upload, normalize, AI cleanup, publish.",
+    "registration": "Supplier registration, INN/address lookup, restore and account transfer.",
+    "team": "Supplier team: members, invites, invite links and join requests.",
+    "reference": "Reference lists for the supplier cabinet.",
+    "products": "Supplier products: list, card, prices, images, archive and bulk actions.",
+    "cabinet": "Supplier cabinet session and settings.",
+    "_shared": "Helpers shared by several supplier view modules."
+  },
+  "patch_targets": {
+    "normalize_supplier_price_upload": "price_uploads"
+  }
+}

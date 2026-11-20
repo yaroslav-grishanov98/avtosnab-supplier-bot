@@ -1,0 +1,88 @@
+{
+  "module": "api/v1/suppliers/services.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py",
+    "autosnab_bots/**/*.py"
+  ],
+  "groups": {
+    "price_uploads": [
+      "SupplierPriceUpload.*",
+      "create_supplier_price_upload_from_.*",
+      "get_supplier_price_upload_.*",
+      "set_supplier_price_upload_column_mapping",
+      "correct_supplier_price_upload_item",
+      "rollback_supplier_price_upload"
+    ],
+    "price_normalization": [
+      "normalize_supplier_price_upload",
+      "start_supplier_price_upload_normalization",
+      "start_supplier_price_upload_ai_cleanup",
+      "_prepare_upload_for_.*",
+      "_run_supplier_price_upload_.*",
+      "AI_CLEANUP_.*"
+    ],
+    "price_apply": [
+      "apply_supplier_price_ai_result",
+      "_get_existing_supplier_product",
+      "_upsert_upload_item",
+      "APPLY_PROGRESS_UPDATE_EVERY"
+    ],
+    "product_refs": [
+      "_resolve_brand",
+      "_resolve_category_path",
+      "_next_system_sku_batch",
+      "_looks_like_valid_brand_name",
+      "_BRAND_NAME_REJECT_PATTERNS"
+    ],
+    "registration": [
+      "create_supplier_by_(staff|owner)",
+      ".*supplier_account_transfer"
+    ],
+    "team": [
+      ".*supplier_team",
+      ".*supplier_user.*",
+      ".*supplier_invite_link.*",
+      ".*supplier_join_request.*",
+      "join_supplier_via_invite_link"
+    ],
+    "products": [
+      ".*supplier_product.*",
+      "suggest_supplier_product_card",
+      ".*_all_supplier_products",
+      "bulk_.*"
+    ],
+    "cabinet": [
+      ".*supplier_cabinet.*",
+      "exchange_cabinet_session_token",
+      "restore_supplier",
+      "upload_supplier_logo",
+      "delete_supplier_image",
+      ".*supplier_(address|contact|bank_account|schedule_rule)",
+      "create_supplier_bot_link_token",
+      "_sync_supplier_nested_collections"
+    ]
+  },
+  "docstrings": {
+    "price_uploads": "Legacy supplier price uploads: create, preview, column mapping, corrections, rollback.",
+    "registration": "Supplier creation and account transfer.",
+    "team": "Supplier team: members, invites, invite links and join requests.",
+    "products": "Supplier products: card, prices, archive, publish, images and bulk actions.",
+    "cabinet": "Supplier cabinet session, settings and bot link.",
+    "_shared": "Helpers shared by several supplier service modules.",
+    "price_normalization": "Legacy price upload normalization and AI cleanup: start, run, progress, queue limits.",
+    "price_apply": "Applying a normalized price upload to the catalog: row classification, caches, bulk writes.",
+    "product_refs": "Brand, category and system SKU resolution shared by product editing and price uploads."
+  },
+  "patch_manual": [
+    "send_mail"
+  ],
+  "patch_targets": {
+    "_run_supplier_price_upload_normalization": "",
+    "_run_supplier_price_upload_ai_cleanup": ""
+  }
+}

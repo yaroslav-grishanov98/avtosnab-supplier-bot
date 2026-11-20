@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>АвтоСнаб — Прайс-листы</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FBFF; color: #1a1a2e; font-size: 14px; }
+
+    /* Nav */
+    .nav { height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E7EC; padding: 0 32px; display: flex; align-items: center; gap: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .nav-logo { font-size: 16px; font-weight: 600; color: #1568F7; display: flex; align-items: center; gap: 8px; }
+    .nav-logo svg { width: 24px; height: 24px; }
+    .nav-links { display: flex; gap: 24px; margin-left: 32px; }
+    .nav-links a { text-decoration: none; color: #667085; font-size: 14px; font-weight: 400; padding: 16px 0; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+    .nav-links a:hover, .nav-links a.active { color: #1568F7; border-bottom-color: #1568F7; font-weight: 500; }
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+    .nav-icon { width: 24px; height: 24px; color: #667085; cursor: pointer; }
+
+    /* Toolbar */
+    .toolbar { padding: 16px 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .toolbar h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
+    .toolbar-right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+
+    .search-input { height: 36px; min-width: 240px; max-width: 320px; padding: 0 12px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 14px; outline: none; background: #FFFFFF; transition: border-color .15s; }
+    .search-input:focus { border-color: #1568F7; }
+
+    .filter-select { height: 36px; padding: 0 12px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 14px; outline: none; background: #FFFFFF; cursor: pointer; }
+    .filter-select:focus { border-color: #1568F7; }
+
+    .count-badge { font-size: 13px; color: #667085; }
+
+    /* Table */
+    .table-wrap { padding: 0 32px 32px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid #E4E7EC; font-size: 13px; }
+    thead th { padding: 10px 12px; text-align: left; font-weight: 500; font-size: 12px; color: #667085; background: #FFFFFF; border-bottom: 1px solid #E4E7EC; white-space: nowrap; }
+    td { padding: 10px 12px; border-bottom: 1px solid #F0F2F5; vertical-align: middle; color: #344054; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F8FBFF; }
+
+    .upload-time { font-weight: 500; color: #1568F7; white-space: nowrap; }
+    .upload-date { font-size: 11px; color: #8E8E93; }
+    .new-badge { display: inline-block; background: #EBF1FF; color: #1568F7; font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; font-weight: 600; }
+
+    /* Status badges */
+    .status-active { display: inline-block; background: #EBF1FF; color: #1568F7; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .status-archived { display: inline-block; background: #F3F4F6; color: #8E8E93; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+
+    /* Buttons */
+    .actions { display: flex; gap: 6px; }
+    .btn { padding: 5px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: opacity .15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-edit { background: #EBF1FF; color: #1568F7; }
+    .btn-archive { background: #FEE2E2; color: #FF3B30; }
+    .btn-restore { background: #EBF1FF; color: #1568F7; }
+
+    .empty { text-align: center; padding: 48px; color: #8E8E93; font-size: 14px; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #FFFFFF; border-radius: 8px; padding: 24px; width: 480px; max-width: 95vw; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #E4E7EC; }
+    .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; font-weight: 500; }
+    .form-group input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #D0D5DD; border-radius: 6px; font-size: 13px; outline: none; }
+    .form-group input:focus { border-color: #1568F7; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+    .btn-primary { background: #1568F7; color: #FFFFFF; padding: 8px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-primary:hover { background: #4F8DFF; }
+    .btn-secondary { background: transparent; border: 1px solid #D0D5DD; color: #344054; padding: 8px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+
+    .loading { text-align: center; padding: 32px; color: #8E8E93; }
+    .error-msg { background: #FEE2E2; color: #FF3B30; padding: 12px 16px; border-radius: 6px; margin: 0 32px 12px; font-size: 13px; display: none; }
+
+    @media (max-width: 768px) {
+      .nav { padding: 0 16px; }
+      .toolbar { padding: 16px; }
+      .table-wrap { padding: 0 8px 16px; }
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1568F7" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg>
+    АвтоСнаб
+  </div>
+  <div class="nav-links">
+    <a href="/prices/" class="active">Прайс-листы</a>
+    <a href="/admin/">Админка</a>
+  </div>
+</nav>
+
+<div class="toolbar">
+  <h1>Прайс-листы</h1>
+  <div class="toolbar-right">
+    <input type="text" id="search" class="search-input" placeholder="Поиск по названию...">
+    <select id="statusFilter" class="filter-select">
+      <option value="">Все статусы</option>
+      <option value="active">Активные</option>
+      <option value="archived">Архив</option>
+    </select>
+    <span class="count-badge" id="countBadge"></span>
+  </div>
+</div>
+
+<div class="error-msg" id="errorMsg"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата загрузки</th>
+        <th>Поставщик</th>
+        <th>Наименование (raw)</th>
+        <th>Наименование (норм.)</th>
+        <th>Цена</th>
+        <th>Ед.изм.</th>
+        <th>Упаковка</th>
+        <th>Мин. заказ</th>
+        <th>Статус</th>
+        <th>Действия</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="10" class="loading">Загрузка...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>Редактировать позицию</h2>
+    <input type="hidden" id="editId">
+    <div class="form-group"><label>Наименование (raw)</label><input type="text" id="editRawName"></div>
+    <div class="form-group"><label>Наименование (норм.)</label><input type="text" id="editNormName"></div>
+    <div class="form-group"><label>Цена</label><input type="number" step="0.01" id="editPrice"></div>
+    <div class="form-group"><label>Упаковка</label><input type="text" id="editPackage"></div>
+    <div class="form-group"><label>Мин. заказ</label><input type="number" step="0.0001" id="editMinQty"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+      <button class="btn-primary" onclick="saveEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1/suppliers';
+const TOKEN = '671fb9f8b5755c6b3004fd307a73a1b1291db5b4ff10de31959950f89b3c7acd';
+const HEADERS = { 'Content-Type': 'application/json', 'X-Service-Token': TOKEN };
+let allProducts = [];
+let searchTimer = null;
+
+async function load(q = '', status = '') {
+  try {
+    const params = new URLSearchParams({ limit: 500 });
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+    const res = await fetch(`${API}/products?${params}`, { headers: HEADERS });
+    if (!res.ok) throw new Error('Ошибка загрузки');
+    const data = await res.json();
+    allProducts = data.results || [];
+    render(allProducts);
+    document.getElementById('countBadge').textContent = `${data.count} позиций`;
+  } catch (e) { showError(e.message); }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '<span style="color:#D0D5DD">—</span>';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffH = (now - d) / 3600000;
+  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const isNew = diffH < 24;
+  return `<div class="upload-time">${time}${isNew ? '<span class="new-badge">NEW</span>' : ''}</div><div class="upload-date">${date}</div>`;
+}
+
+function render(products) {
+  const tbody = document.getElementById('tableBody');
+  if (!products.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Нет позиций. Отправьте прайс-лист через Telegram.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = products.map(p => `<tr>
+    <td>${formatDateTime(p.uploaded_at)}</td>
+    <td>${p.supplier_name || '—'}</td>
+    <td>${p.supplier_raw_name || '—'}</td>
+    <td>${p.supplier_normalized_name || '—'}</td>
+    <td style="font-weight:500">${p.current_price != null ? Number(p.current_price).toLocaleString('ru-RU', {minimumFractionDigits:2}) + ' ₽' : '—'}</td>
+    <td>${p.unit || '—'}</td>
+    <td>${p.package || '—'}</td>
+    <td>${p.min_order_qty != null ? Number(p.min_order_qty).toLocaleString('ru-RU') : '—'}</td>
+    <td><span class="status-${p.status}">${p.status === 'active' ? 'Активен' : 'Архив'}</span></td>
+    <td><div class="actions">
+      <button class="btn btn-edit" onclick="openEdit('${p.id}')">Изменить</button>
+      ${p.status === 'active'
+        ? `<button class="btn btn-archive" onclick="archive('${p.id}')">В архив</button>`
+        : `<button class="btn btn-restore" onclick="restore('${p.id}')">Восстановить</button>`}
+    </div></td>
+  </tr>`).join('');
+}
+
+function openEdit(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('editId').value = id;
+  document.getElementById('editRawName').value = p.supplier_raw_name || '';
+  document.getElementById('editNormName').value = p.supplier_normalized_name || '';
+  document.getElementById('editPrice').value = p.current_price || '';
+  document.getElementById('editPackage').value = p.package || '';
+  document.getElementById('editMinQty').value = p.min_order_qty || '';
+  document.getElementById('editModal').classList.add('open');
+}
+function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+async function saveEdit() {
+  const id = document.getElementById('editId').value;
+  const body = {};
+  const raw = document.getElementById('editRawName').value.trim();
+  const norm = document.getElementById('editNormName').value.trim();
+  const price = document.getElementById('editPrice').value;
+  const pkg = document.getElementById('editPackage').value.trim();
+  const minQty = document.getElementById('editMinQty').value;
+  if (raw) body.supplier_raw_name = raw;
+  if (norm) body.supplier_normalized_name = norm;
+  if (price) body.price = price;
+  if (pkg) body.package = pkg;
+  if (minQty) body.min_order_qty = minQty;
+  try {
+    const res = await fetch(`${API}/products/${id}`, { method: 'PATCH', headers: HEADERS, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error('Ошибка сохранения');
+    closeModal();
+    load(document.getElementById('search').value, document.getElementById('statusFilter').value);
+  } catch (e) { showError(e.message); }
+}
+
+async function archive(id) {
+  if (!confirm('Перенести в архив?')) return;
+  try {
+    const res = await fetch(`${API}/products/${id}/archive`, { method: 'POST', headers: HEADERS });
+    if (!res.ok) throw new Error('Ошибка');
+    load(document.getElementById('search').value, document.getElementById('statusFilter').value);
+  } catch (e) { showError(e.message); }
+}
+
+async function restore(id) {
+  try {
+    const res = await fetch(`${API}/products/${id}`, { method: 'PATCH', headers: HEADERS, body: JSON.stringify({ status: 'active' }) });
+    if (!res.ok) throw new Error('Ошибка');
+    load(document.getElementById('search').value, document.getElementById('statusFilter').value);
+  } catch (e) { showError(e.message); }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => load(e.target.value, document.getElementById('statusFilter').value), 350);
+});
+document.getElementById('statusFilter').addEventListener('change', e => {
+  load(document.getElementById('search').value, e.target.value);
+});
+document.getElementById('editModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+load();
+</script>
+</body>
+</html>

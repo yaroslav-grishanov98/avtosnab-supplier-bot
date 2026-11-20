@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Доступ к компании</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.hint { color: #666; font-size: 13px; margin-top: 0; }
+  section { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; }
+  section[hidden] { display: none; }
+  label { display: block; font-size: 13px; color: #444; margin-top: 10px; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  button { cursor: pointer; padding: 7px 14px; border: 1px solid #2c6ecb; border-radius: 4px; background: #2c6ecb; color: #fff; font-size: 13px; margin-top: 10px; }
+  button:hover { background: #2159a8; }
+  button.secondary { background: #fff; color: #333; border-color: #999; }
+  button.secondary:hover { background: #f2f2f2; }
+  button.danger { background: #fff; color: #c0392b; border-color: #c0392b; }
+  button.danger:hover { background: #fff0ef; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th, td { border: 1px solid #e5e5e5; padding: 8px; text-align: left; }
+  th { background: #fafafa; font-weight: 600; }
+  .role-owner { color: #2c6ecb; font-weight: 600; }
+  .role-manager { color: #555; }
+  .msg { margin-top: 10px; font-size: 13px; padding: 8px 10px; border-radius: 4px; }
+  .msg.ok { background: #eaf7ee; color: #1a7f37; }
+  .msg.error { background: #fdeeec; color: #c0392b; }
+  .whoami { font-size: 13px; color: #666; }
+  .inline-form { display: flex; gap: 8px; align-items: flex-end; }
+  .inline-form > div { flex: 1; }
+  .inline-form button { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<h1>Доступ к компании</h1>
+<p class="hint">Список участников компании, приглашение по email, отзыв доступа — только для владельца компании.</p>
+
+<section id="login-section">
+  <label>Email</label>
+  <input id="login-email" type="email" autocomplete="username">
+  <label>Пароль</label>
+  <input id="login-password" type="password" autocomplete="current-password">
+  <button onclick="login()">Войти</button>
+  <div id="login-msg"></div>
+</section>
+
+<section id="app-section" hidden>
+  <div class="whoami">Вы вошли как <b id="whoami-email"></b> · <button class="secondary" onclick="logout()" style="margin-top:0;">Выйти</button></div>
+
+  <label>Компания</label>
+  <select id="supplier-select" onchange="onSupplierChange()"></select>
+
+  <div id="team-error"></div>
+
+  <table id="team-table" hidden>
+    <thead>
+      <tr><th>Email</th><th>Имя</th><th>Роль</th><th>Доступ с</th><th></th></tr>
+    </thead>
+    <tbody id="team-tbody"></tbody>
+  </table>
+
+  <section>
+    <h3 style="font-size:14px;">Пригласить сотрудника</h3>
+    <div class="inline-form">
+      <div>
+        <label>Email приглашаемого</label>
+        <input id="invite-email" type="email">
+      </div>
+      <button onclick="invite()">Пригласить</button>
+    </div>
+    <div id="invite-msg"></div>
+  </section>
+</section>
+
+<script>
+const API = "/api/v1";
+let accessToken = localStorage.getItem("team_access_jwt") || null;
+let userEmail = localStorage.getItem("team_access_email") || null;
+let suppliers = [];
+let currentSupplierId = null;
+
+async function call(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
+  const resp = await fetch(API + path, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  let data = null;
+  try { data = await resp.json(); } catch (e) { /* no body */ }
+  return { status: resp.status, data };
+}
+
+function showMsg(elId, text, ok) {
+  const el = document.getElementById(elId);
+  el.innerHTML = `<div class="msg ${ok ? "ok" : "error"}">${text}</div>`;
+}
+
+async function login() {
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const { status, data } = await call("POST", "/auth/supplier/login", { email, password });
+  if (status !== 200) {
+    showMsg("login-msg", (data && data.detail) || `Ошибка входа (${status})`, false);
+    return;
+  }
+  accessToken = data.access;
+  userEmail = data.email;
+  localStorage.setItem("team_access_jwt", accessToken);
+  localStorage.setItem("team_access_email", userEmail);
+  await enterApp();
+}
+
+function logout() {
+  accessToken = null;
+  userEmail = null;
+  localStorage.removeItem("team_access_jwt");
+  localStorage.removeItem("team_access_email");
+  document.getElementById("app-section").hidden = true;
+  document.getElementById("login-section").hidden = false;
+}
+
+async function enterApp() {
+  document.getElementById("login-section").hidden = true;
+  document.getElementById("app-section").hidden = false;
+  document.getElementById("whoami-email").textContent = userEmail || "";
+
+  const { status, data } = await call("GET", "/suppliers/mine");
+  if (status !== 200) {
+    showMsg("team-error", `Не удалось получить список компаний (${status})`, false);
+    return;
+  }
+  suppliers = data;
+  const select = document.getElementById("supplier-select");
+  select.innerHTML = suppliers.length
+    ? suppliers.map((s) => `<option value="${s.id}">${s.display_name}</option>`).join("")
+    : "<option>Нет компаний</option>";
+  if (suppliers.length) {
+    currentSupplierId = suppliers[0].id;
+    await loadTeam();
+  }
+}
+
+function onSupplierChange() {
+  currentSupplierId = document.getElementById("supplier-select").value;
+  loadTeam();
+}
+
+async function loadTeam() {
+  document.getElementById("team-error").innerHTML = "";
+  document.getElementById("team-table").hidden = true;
+  if (!currentSupplierId) return;
+
+  const { status, data } = await call("GET", `/suppliers/${currentSupplierId}/users`);
+  if (status === 403) {
+    showMsg("team-error", "Список участников и управление доступом доступны только владельцу компании.", false);
+    return;
+  }
+  if (status !== 200) {
+    showMsg("team-error", `Не удалось получить список участников (${status})`, false);
+    return;
+  }
+
+  const tbody = document.getElementById("team-tbody");
+  tbody.innerHTML = data.map((member) => `
+    <tr>
+      <td>${member.email}</td>
+      <td>${member.full_name || ""}</td>
+      <td class="role-${member.role}">${member.role === "owner" ? "Владелец" : member.role === "manager" ? "Менеджер" : member.role}</td>
+      <td>${new Date(member.created_at).toLocaleDateString("ru-RU")}</td>
+      <td><button class="danger" onclick="revoke('${member.user_id}')">Отозвать доступ</button></td>
+    </tr>
+  `).join("");
+  document.getElementById("team-table").hidden = false;
+}
+
+async function revoke(userId) {
+  if (!confirm("Отозвать доступ этому участнику?")) return;
+  const { status, data } = await call("POST", `/suppliers/${currentSupplierId}/users/${userId}/revoke`);
+  if (status !== 200) {
+    showMsg("team-error", (data && data.detail) || `Не удалось отозвать доступ (${status})`, false);
+    return;
+  }
+  await loadTeam();
+}
+
+async function invite() {
+  const email = document.getElementById("invite-email").value.trim();
+  if (!email) return;
+  const { status, data } = await call("POST", `/suppliers/${currentSupplierId}/invites`, { target_email: email });
+  if (status !== 201) {
+    showMsg("invite-msg", (data && data.detail) || `Не удалось отправить приглашение (${status})`, false);
+    return;
+  }
+  showMsg("invite-msg", `Приглашение отправлено на ${email}. Доступ появится в списке после того, как он перейдёт по ссылке из письма и задаст пароль.`, true);
+  document.getElementById("invite-email").value = "";
+}
+
+if (accessToken && userEmail) {
+  enterApp();
+}
+</script>
+</body>
+</html>

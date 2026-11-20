@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Добавить компанию | АвтоСнаб</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FBFF; color: #1a1a2e; font-size: 14px; }
+
+    .nav { height: 56px; background: #fff; border-bottom: 1px solid #E4E7EC; padding: 0 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .nav-logo { font-size: 16px; font-weight: 600; color: #1568F7; }
+    .nav-back { font-size: 13px; color: #667085; text-decoration: none; }
+    .nav-back:hover { color: #1568F7; }
+
+    .container { max-width: 540px; margin: 40px auto; padding: 0 24px 60px; }
+
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .page-desc { color: #667085; font-size: 13px; margin-bottom: 28px; line-height: 1.5; }
+
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: #344054; margin-bottom: 6px; }
+    label span.req { color: #EF4444; }
+    input[type=text], input[type=email], input[type=tel], textarea {
+      width: 100%; padding: 9px 12px; border: 1px solid #D0D5DD; border-radius: 6px;
+      font-size: 14px; color: #1a1a2e; background: #fff; outline: none;
+    }
+    input:focus, textarea:focus { border-color: #1568F7; box-shadow: 0 0 0 3px rgba(21,104,247,.12); }
+    .field-error { border-color: #EF4444 !important; }
+    .error-msg { font-size: 12px; color: #EF4444; margin-top: 4px; }
+    textarea { resize: vertical; min-height: 72px; }
+    .hint { font-size: 12px; color: #98A2B3; margin-top: 4px; }
+
+    .submit-btn {
+      width: 100%; padding: 11px; background: #1568F7; color: #fff; border: none; border-radius: 6px;
+      font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
+    }
+    .submit-btn:hover { background: #1250D0; }
+
+    .success-box { background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .success-box h3 { font-size: 16px; font-weight: 600; color: #065F46; margin-bottom: 8px; }
+    .success-box p { color: #047857; font-size: 13px; line-height: 1.6; }
+
+    .warning-box { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 18px 20px; margin-bottom: 20px; }
+    .warning-box h4 { font-size: 14px; font-weight: 600; color: #92400E; margin-bottom: 6px; }
+    .warning-box p { color: #78350F; font-size: 13px; line-height: 1.5; }
+    .warning-box a { color: #1568F7; }
+
+    .divider { height: 1px; background: #E4E7EC; margin: 24px 0; }
+    .section-label { font-size: 11px; font-weight: 600; color: #98A2B3; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+    .company-found { background: #fff; border: 1px solid #E4E7EC; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .company-found-name { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+    .company-found-inn { font-size: 12px; color: #667085; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <span class="nav-logo">АвтоСнаб</span>
+    <a class="nav-back" href="/suppliers/">← Все поставщики</a>
+  </nav>
+
+  <div class="container">
+
+    {% if rate_limited %}
+      <div class="warning-box">
+        <h4>Слишком много попыток</h4>
+        <p>Пожалуйста, подождите немного перед следующей отправкой.</p>
+      </div>
+
+    {% elif duplicate %}
+      <div class="warning-box">
+        <h4>Заявка уже отправлена</h4>
+        <p>Мы уже получили вашу заявку на эту компанию и обработаем её в ближайшее время.</p>
+      </div>
+
+    {% elif success %}
+      <div class="success-box">
+        <h3>Заявка отправлена</h3>
+        <p>Мы получили запрос на добавление вашей компании. Менеджер свяжется с вами в течение 1–2 рабочих дней.</p>
+      </div>
+      <div style="margin-top:16px;">
+        <a href="/suppliers/" style="color:#1568F7;font-size:13px;text-decoration:none;">← Вернуться к списку поставщиков</a>
+      </div>
+
+    {% elif existing_supplier %}
+      <h1>Компания уже есть в базе</h1>
+      <p class="page-desc">Компания с таким ИНН уже зарегистрирована. Если это ваша компания, свяжитесь с менеджером АвтоСнаб для получения доступа.</p>
+      <div class="company-found">
+        <div class="company-found-name">{{ existing_supplier.display_name }}</div>
+        <div class="company-found-inn">ИНН: {{ existing_inn_display }}</div>
+      </div>
+
+    {% else %}
+      <h1>Добавить компанию</h1>
+      <p class="page-desc">Не нашли свою компанию в списке? Заполните заявку — мы добавим её и свяжемся с вами для подтверждения.</p>
+
+      <form method="POST">
+        {% csrf_token %}
+
+        <div class="section-label">Данные компании</div>
+
+        <div class="form-group">
+          <label>Название компании <span class="req">*</span></label>
+          <input type="text" name="company_name" value="{{ form_data.company_name|default:'' }}" placeholder="ООО Ромашка" class="{% if errors.company_name %}field-error{% endif %}">
+          {% if errors.company_name %}<div class="error-msg">{{ errors.company_name }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>ИНН <span class="req">*</span></label>
+          <input type="text" name="inn" value="{{ form_data.inn|default:'' }}" placeholder="7707083893" class="{% if errors.inn %}field-error{% endif %}">
+          <div class="hint">10 цифр (юр. лицо) или 12 цифр (ИП)</div>
+          {% if errors.inn %}<div class="error-msg">{{ errors.inn }}</div>{% endif %}
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">Контактные данные</div>
+
+        <div class="form-group">
+          <label>Ваше полное имя <span class="req">*</span></label>
+          <input type="text" name="full_name" value="{{ form_data.full_name|default:'' }}" placeholder="Иван Иванов" class="{% if errors.full_name %}field-error{% endif %}">
+          {% if errors.full_name %}<div class="error-msg">{{ errors.full_name }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>Email <span class="req">*</span></label>
+          <input type="email" name="email" value="{{ form_data.email|default:'' }}" placeholder="ivan@company.ru" class="{% if errors.email %}field-error{% endif %}">
+          {% if errors.email %}<div class="error-msg">{{ errors.email }}</div>{% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>Телефон</label>
+          <input type="tel" name="phone" value="{{ form_data.phone|default:'' }}" placeholder="+7 900 000-00-00">
+        </div>
+
+        <div class="form-group">
+          <label>Комментарий (необязательно)</label>
+          <textarea name="message" placeholder="Чем занимается компания, какие товары поставляете...">{{ form_data.message|default:'' }}</textarea>
+        </div>
+
+        <button type="submit" class="submit-btn">Отправить заявку</button>
+      </form>
+    {% endif %}
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Поставщики — АвтоСнаб</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FBFF; color: #1a1a2e; font-size: 14px; }
+
+    .nav { height: 56px; background: #fff; border-bottom: 1px solid #E4E7EC; padding: 0 32px; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .nav-logo { font-size: 16px; font-weight: 600; color: #1568F7; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 32px 32px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { color: #667085; margin-bottom: 24px; }
+
+    .search-bar { margin-bottom: 20px; }
+    .search-bar input {
+      width: 100%; padding: 10px 14px; border: 1px solid #D0D5DD; border-radius: 8px;
+      font-size: 14px; outline: none; background: #fff;
+    }
+    .search-bar input:focus { border-color: #1568F7; box-shadow: 0 0 0 3px rgba(21,104,247,.12); }
+    .search-hint { font-size: 12px; color: #98A2B3; margin-top: 6px; }
+
+    .supplier-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .supplier-card {
+      background: #fff; border: 1px solid #E4E7EC; border-radius: 8px; padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 10px; transition: box-shadow .15s;
+    }
+    .supplier-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .supplier-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .supplier-legal { font-size: 12px; color: #667085; }
+    .supplier-inn { font-size: 12px; color: #98A2B3; }
+
+    .empty { text-align: center; padding: 60px 0; color: #667085; }
+    .add-cta { margin-top: 32px; padding: 16px 20px; background: #F0F5FF; border: 1px solid #C7D7FD; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; }
+    .add-cta span { font-size: 13px; color: #344054; }
+    .add-cta a { font-size: 13px; font-weight: 600; color: #1568F7; text-decoration: none; }
+    .add-cta a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <span class="nav-logo">АвтоСнаб</span>
+  </nav>
+
+  <div class="container">
+    <h1>Поставщики на платформе</h1>
+    <p class="subtitle">Найдите свою компанию и запросите права владельца.</p>
+
+    <div class="search-bar">
+      <input type="text" id="search" placeholder="Поиск по названию или первым цифрам ИНН..." oninput="filterSuppliers()" autocomplete="off">
+      <div class="search-hint">По ИНН можно искать по части номера, например «7707»</div>
+    </div>
+
+    {% if suppliers %}
+      <div class="supplier-grid" id="grid">
+        {% for s in suppliers %}
+        <div class="supplier-card" data-name="{{ s.display_name|lower }}" data-legal="{{ s.legal_name|lower }}" data-inn="{{ s.inn }}">
+          <div>
+            <div class="supplier-name">{{ s.display_name }}</div>
+            {% if s.legal_name and s.legal_name != s.display_name %}
+            <div class="supplier-legal">{{ s.legal_name }}</div>
+            {% endif %}
+            {% if s.inn_masked %}
+            <div class="supplier-inn">ИНН: {{ s.inn_masked }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="empty" id="empty-msg" style="display:none;">
+        Поставщики не найдены. <a href="/suppliers/add/" style="color:#1568F7;">Добавить компанию?</a>
+      </div>
+    {% else %}
+      <div class="empty">Поставщики ещё не добавлены.</div>
+    {% endif %}
+
+    <div class="add-cta">
+      <span>Не нашли свою компанию?</span>
+      <a href="/suppliers/add/">Добавить компанию</a>
+    </div>
+  </div>
+
+  <script>
+    function filterSuppliers() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.supplier-card');
+      let visible = 0;
+      cards.forEach(card => {
+        const match = !q || card.dataset.name.includes(q) || card.dataset.legal.includes(q) || card.dataset.inn.includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      document.getElementById('empty-msg').style.display = visible === 0 ? '' : 'none';
+    }
+  </script>
+</body>
+</html>

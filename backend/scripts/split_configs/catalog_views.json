@@ -1,0 +1,92 @@
+{
+  "module": "api/v1/catalog/views.py",
+  "tests": [
+    "api/**/*.py",
+    "catalog/**/*.py",
+    "core/**/*.py",
+    "suppliers/**/*.py",
+    "notifications/**/*.py",
+    "file_imports/**/*.py"
+  ],
+  "groups": {
+    "import_sessions": [
+      "CatalogImportSession.*"
+    ],
+    "import_common": [
+      "ImportSessionBusy",
+      "ImportQueueUnavailableError",
+      "ImportFileStorageUnavailableError"
+    ],
+    "products": [
+      "Catalog(Product|Photo|Brand|Category|Supplier|Country).*"
+    ],
+    "favorites": [
+      "VenueFavorite.*",
+      "Wishlist.*"
+    ],
+    "orders": [
+      "VenueCart.*",
+      "VenueOrder.*",
+      "VenueMineOrders.*",
+      "SupplierOrder.*",
+      "VenueSupplierOrderRequest.*",
+      "Venue(Mine)?Unresolved.*",
+      "VenueMineUnresolved.*"
+    ],
+    "order_templates": [
+      "OrderTemplate.*",
+      "OrderSaveAsTemplate.*"
+    ],
+    "venue_structure": [
+      "VenueSubdivision.*",
+      "VenueAddress.*",
+      "OffSystemSupplier.*"
+    ],
+    "product_matrix": [
+      "VenueProductMatrix.*"
+    ],
+    "venue_import": [
+      "VenueProductImport.*"
+    ],
+    "google_sheets": [
+      "GoogleSheet.*"
+    ],
+    "master_catalog": [
+      "Master.*"
+    ],
+    "tenders": [
+      "Tender.*",
+      "SupplierTender.*",
+      "SupplierMineTender.*"
+    ],
+    "product_lists": [
+      "VenueProductList.*"
+    ],
+    "supplier_prices": [
+      "SupplierProductVenuePrice.*"
+    ]
+  },
+  "docstrings": {
+    "import_sessions": "Catalog import review sessions (Master/Venue).",
+    "import_common": "Errors shared by the catalog import views.",
+    "products": "Public catalog: products, photo search and reference lists.",
+    "favorites": "Venue favorites and wishlists.",
+    "orders": "Venue cart, orders and supplier order requests.",
+    "order_templates": "Venue order templates.",
+    "venue_structure": "Venue subdivisions, addresses and off-system suppliers.",
+    "product_matrix": "Venue product matrix (company directory) and supplier matching.",
+    "venue_import": "Venue product import (file preview, apply, master match).",
+    "google_sheets": "Google Sheets export and sync log.",
+    "master_catalog": "Master catalog: products, imports, venue links and bulk actions.",
+    "tenders": "Tenders: buyer side, supplier side, items, files, offers and distribution.",
+    "product_lists": "Venue product lists.",
+    "supplier_prices": "Supplier product prices per venue.",
+    "_shared": "Helpers shared by several catalog view modules."
+  },
+  "patch_manual": [
+    "parse_catalog_file"
+  ],
+  "patch_targets": {
+    "apply_master_product_import": "import_sessions"
+  }
+}
